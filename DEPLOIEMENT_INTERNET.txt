@@ -1,0 +1,23 @@
+GESTIONPRO / HBZ RENT CAR - MISE EN LIGNE
+=========================================
+
+Le site est maintenant préparé pour un hébergement public HTTPS.
+
+1. Serveur
+- Copier le dossier site_web sur le serveur.
+- Créer les variables d'environnement d'après .env.example.
+- GESTIONPRO_API_TOKEN doit être long, privé et identique au token du PC GestionPro.
+- Lancer production_server.py derrière un reverse proxy HTTPS, ou utiliser Docker Compose.
+
+2. Domaine
+- Pointer votre domaine (exemple : www.hbzrentcar.ma) vers l'hébergeur.
+- Activer HTTPS sur l'hébergeur/reverse proxy.
+- Ne jamais publier le fichier gestion.db du PC.
+
+3. Synchronisation avec GestionPro Windows
+- Copier sync_web_config.json.example vers sync_web_config.json à la racine GestionPro.
+- Mettre base_url = l'adresse HTTPS du site.
+- Mettre api_token = la même valeur que GESTIONPRO_API_TOKEN sur le serveur.
+- Dans GestionPro, utiliser le bouton « Synchroniser Web » du menu latéral.
+
+La synchronisation envoie le parc du PC vers le site et récupère les réservations Web dans la table Réservations du PC.

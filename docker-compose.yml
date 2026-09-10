@@ -1,0 +1,18 @@
+services:
+  gestionpro-web:
+    build: .
+    restart: unless-stopped
+    environment:
+      - FLASK_SECRET_KEY=${FLASK_SECRET_KEY}
+      - GESTIONPRO_API_TOKEN=${GESTIONPRO_API_TOKEN}
+      - COOKIE_SECURE=1
+      - GESTIONPRO_WEB_DB=/data/gestion_web.db
+      - PORT=8000
+    volumes:
+      - gestionpro_web_data:/data
+      - gestionpro_web_uploads:/app/static/uploads
+    ports:
+      - "8000:8000"
+volumes:
+  gestionpro_web_data:
+  gestionpro_web_uploads:

@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{% block title %}HBZ Rent Car{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="{{ url_for('home') }}">
+      <div class="logo">HBZ</div>
+      <div><b>HBZ Rent Car</b><small>Location • Réservation • Gestion de parc</small></div>
+    </a>
+    {% if session.get('web_user') %}
+    <nav class="admin-nav">
+      <a href="{{ url_for('admin_dashboard') }}" class="{% if request.endpoint=='admin_dashboard' %}active{% endif %}">Réservations</a>
+      <a href="{{ url_for('admin_fleet') }}" class="{% if request.endpoint in ['admin_fleet','admin_fleet_add','admin_fleet_edit'] %}active{% endif %}">Parc</a>
+      <a href="{{ url_for('home') }}">Site public</a>
+    </nav>
+    <div class="admin-user"><span class="user-dot"></span>{{ session.get('web_user') }}
+      <form method="post" action="{{ url_for('admin_logout') }}"><input type="hidden" name="_csrf" value="{{ csrf_token() }}"><button class="linkbtn">Déconnexion</button></form>
+    </div>
+    {% else %}
+    <a class="header-cta" href="{{ url_for('admin_dashboard') }}">Administration</a>
+    {% endif %}
+  </div>
+</header>
+{% with msgs=get_flashed_messages(with_categories=true) %}{% if msgs %}<div class="flash-wrap">{% for cat,msg in msgs %}<div class="flash {{cat}}">{{msg}}</div>{% endfor %}</div>{% endif %}{% endwith %}
+<main>{% block content %}{% endblock %}</main>
+<footer><b>HBZ Rent Car</b><span>GestionPro Web • {{ current_year }}</span></footer>
+</body>
+</html>

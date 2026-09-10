@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% block title %}HBZ Rent Car — Réservation{% endblock %}
+{% block content %}
+<section class="hero hero-premium">
+  <div class="hero-copy">
+    <span class="pill">Réservation directe & sécurisée</span>
+    <h1>Votre voiture, prête au bon moment.</h1>
+    <p>Découvrez le parc HBZ Rent Car, choisissez votre véhicule et envoyez votre demande de réservation. Notre équipe la reçoit directement dans GestionPro.</p>
+    <div class="hero-actions"><a class="primary" href="#reservation">Réserver maintenant</a><a class="ghost-button" href="#parc">Voir le parc</a></div>
+    <div class="trust-row"><span>✓ Parc suivi</span><span>✓ Réservation sécurisée</span><span>✓ Confirmation rapide</span></div>
+  </div>
+  <div class="hero-panel">
+    <div class="hero-panel-number">{{ vehicles|length }}</div>
+    <div class="hero-panel-label">véhicules en service</div>
+    <div class="hero-car-icon">⌁</div>
+  </div>
+</section>
+
+<section id="parc" class="section-block">
+  <div class="section-heading"><div><span class="eyebrow">NOTRE PARC</span><h2>Choisissez votre véhicule</h2><p>Les véhicules affichés sont actuellement enregistrés EN SERVICE dans GestionPro.</p></div></div>
+  <div class="vehicle-grid">
+    {% for v in vehicles %}
+    <article class="vehicle-card">
+      <div class="vehicle-photo">
+        {% if media.get(v.code_vehicule) %}<img src="{{ url_for('static', filename='uploads/vehicules/' + media.get(v.code_vehicule)) }}" alt="{{v.marque}}">
+        {% else %}<div class="vehicle-placeholder"><span>HBZ</span><small>RENT CAR</small></div>{% endif %}
+        <span class="availability-badge">Disponible à la réservation</span>
+      </div>
+      <div class="vehicle-body">
+        <div class="vehicle-title"><div><h3>{{v.marque or 'Véhicule'}}</h3><span>{{v.immatriculation}}</span></div><div class="price">{% if v.prix_jour %}<b>{{'%.0f'|format(v.prix_jour)}} MAD</b><small>/ jour</small>{% else %}<b>Sur demande</b>{% endif %}</div></div>
+        <div class="vehicle-meta"><span>Code {{v.code_vehicule}}</span>{% if v.compteur %}<span>{{'%.0f'|format(v.compteur)}} km</span>{% endif %}</div>
+        <a href="#reservation" class="vehicle-select" data-code="{{v.code_vehicule}}">Choisir ce véhicule</a>
+      </div>
+    </article>
+    {% else %}
+    <div class="empty-card">Aucun véhicule en service n’est actuellement publié.</div>
+    {% endfor %}
+  </div>
+</section>
+
+<section id="reservation" class="reservation-layout">
+  <div class="reservation-intro"><span class="eyebrow">RÉSERVATION</span><h2>Envoyez votre demande</h2><p>Indiquez vos coordonnées et votre période. GestionPro vérifie automatiquement les chevauchements avec les locations et réservations existantes.</p><div class="info-box"><b>Après l’envoi</b><span>Votre demande reçoit le statut EN ATTENTE. L’agence peut ensuite la confirmer depuis l’administration.</span></div></div>
+  <section class="card reservation-card">
+    <form method="post" action="{{ url_for('reserve') }}" class="grid"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+      <label>Nom *<input name="nom" required maxlength="80" autocomplete="family-name"></label><label>Prénom *<input name="prenom" required maxlength="80" autocomplete="given-name"></label>
+      <label>Téléphone *<input name="telephone" required maxlength="30" placeholder="06..." autocomplete="tel"></label><label>CIN<input name="cin" maxlength="40"></label>
+      <label class="wide">Véhicule *<select id="vehicleSelect" name="code_vehicule" required><option value="">Choisir un véhicule...</option>{% for v in vehicles %}<option value="{{v.code_vehicule}}">{{v.marque}} — {{v.immatriculation}}{% if v.prix_jour %} — {{'%.0f'|format(v.prix_jour)}} MAD/jour{% endif %}</option>{% endfor %}</select></label>
+      <label>Date départ *<input type="date" name="date_depart" required></label><label>Heure départ<select name="heure_depart">{% for h in ['08:00','09:00','10:00','11:00','12:00','14:00','15:00','16:00','17:00','18:00'] %}<option>{{h}}</option>{% endfor %}</select></label>
+      <label>Date retour *<input type="date" name="date_retour" required></label><label>Heure retour<select name="heure_retour">{% for h in ['08:00','09:00','10:00','11:00','12:00','14:00','15:00','16:00','17:00','18:00'] %}<option>{{h}}</option>{% endfor %}</select></label>
+      <label class="wide">Observation<textarea name="observation" maxlength="500" rows="3" placeholder="Besoin particulier, lieu souhaité, remarque..."></textarea></label>
+      <div class="wide actions"><button class="primary primary-large">Envoyer la demande de réservation</button></div>
+    </form>
+  </section>
+</section>
+<script>
+document.querySelectorAll('.vehicle-select').forEach(function(a){a.addEventListener('click',function(){var s=document.getElementById('vehicleSelect'); if(s){s.value=this.dataset.code;}})});
+</script>
+{% endblock %}

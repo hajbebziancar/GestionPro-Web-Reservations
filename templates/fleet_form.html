@@ -1,0 +1,19 @@
+{% extends 'base.html' %}{% block title %}{% if mode=='add' %}Ajouter un véhicule{% else %}Modifier le véhicule{% endif %}{% endblock %}{% block content %}
+<div class="form-page-head"><a href="{{url_for('admin_fleet')}}" class="back-link">← Retour au parc</a><span class="eyebrow">GESTION DU PARC</span><h1>{% if mode=='add' %}Ajouter un véhicule{% else %}Modifier le véhicule {{suggested_code}}{% endif %}</h1><p>Les informations enregistrées ici sont utilisées directement par GestionPro et par le site public.</p></div>
+<form class="vehicle-form-card" method="post" enctype="multipart/form-data"><input type="hidden" name="_csrf" value="{{csrf_token()}}">
+  <div class="form-section"><div><h2>Identification</h2><p>Informations principales du véhicule.</p></div><div class="form-grid">
+    <label>Code véhicule *<input name="code_vehicule" value="{% if mode=='edit' %}{{suggested_code}}{% elif vehicle %}{{vehicle.get('code_vehicule',suggested_code)}}{% else %}{{suggested_code}}{% endif %}" {% if mode=='edit' %}readonly{% endif %} required></label>
+    <label>Marque / modèle *<input name="marque" value="{{ vehicle.marque if vehicle and vehicle.marque is defined else (vehicle.get('marque','') if vehicle else '') }}" required></label>
+    <label>Immatriculation *<input name="immatriculation" value="{{ vehicle.immatriculation if vehicle and vehicle.immatriculation is defined else (vehicle.get('immatriculation','') if vehicle else '') }}" required></label>
+    <label>N° châssis<input name="num_chassis" value="{{ vehicle.num_chassis if vehicle and vehicle.num_chassis is defined else (vehicle.get('num_chassis','') if vehicle else '') }}"></label>
+  </div></div>
+  <div class="form-section"><div><h2>Exploitation</h2><p>État, tarif et kilométrage.</p></div><div class="form-grid">
+    <label>État<select name="service"><option value="EN SERVICE" {% if not vehicle or (vehicle.service if vehicle and vehicle.service is defined else vehicle.get('service','EN SERVICE'))=='EN SERVICE' %}selected{% endif %}>EN SERVICE</option><option value="HORS SERVICE" {% if vehicle and (vehicle.service if vehicle.service is defined else vehicle.get('service',''))=='HORS SERVICE' %}selected{% endif %}>HORS SERVICE</option></select></label>
+    <label>Prix / jour (MAD)<input type="number" min="0" step="0.01" name="prix_jour" value="{{ vehicle.prix_jour if vehicle and vehicle.prix_jour is defined and vehicle.prix_jour is not none else (vehicle.get('prix_jour','0') if vehicle else '0') }}"></label>
+    <label>Compteur (km)<input type="number" min="0" step="1" name="compteur" value="{{ vehicle.compteur if vehicle and vehicle.compteur is defined and vehicle.compteur is not none else (vehicle.get('compteur','0') if vehicle else '0') }}"></label>
+    <label class="wide">Remarque<textarea name="remarque" rows="3" maxlength="500">{{ vehicle.remarque if vehicle and vehicle.remarque is defined and vehicle.remarque else (vehicle.get('remarque','') if vehicle else '') }}</textarea></label>
+  </div></div>
+  <div class="form-section"><div><h2>Photo du véhicule</h2><p>JPG, PNG ou WEBP. Cette photo apparaît sur le site public.</p></div><div class="photo-upload-area">{% if image %}<img class="current-photo" src="{{url_for('static', filename='uploads/vehicules/'+image)}}" alt="Photo véhicule">{% else %}<div class="photo-placeholder">PHOTO<br><small>HBZ RENT CAR</small></div>{% endif %}<label class="upload-label">Choisir une photo<input type="file" name="photo" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"></label></div></div>
+  <div class="form-footer"><a class="ghost-button" href="{{url_for('admin_fleet')}}">Annuler</a><button class="primary primary-large">{% if mode=='add' %}Ajouter au parc{% else %}Enregistrer les modifications{% endif %}</button></div>
+</form>
+{% endblock %}
