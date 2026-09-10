@@ -98,15 +98,6 @@ def csrf_token():
 app.jinja_env.globals['csrf_token'] = csrf_token
 app.jinja_env.globals['current_year'] = datetime.now().year
 
-@app.before_request
-def csrf_protect():
-    if request.path.startswith('/api/'):
-        return    
-   if request.method in {'POST','PUT','PATCH','DELETE'}:
-        expected = session.get('_csrf','')
-        supplied = request.form.get('_csrf','') or request.headers.get('X-CSRF-Token','')
-        if not expected or not secrets.compare_digest(expected, supplied):
-            abort(400, 'Jeton de sécurité invalide. Rechargez la page.')
 
 def admin_count():
     with db() as c:
