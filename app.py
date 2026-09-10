@@ -98,6 +98,18 @@ def csrf_token():
 app.jinja_env.globals['csrf_token'] = csrf_token
 app.jinja_env.globals['current_year'] = datetime.now().year
 
+@app.before_request
+def csrf_protect():
+    # Les routes API GestionPro utilisent leur propre authentification Bearer.
+    # Elles ne doivent pas être bloquées par le CSRF des formulaires Web.
+    if request.path.startswith('/api/'):
+        return
+
+    if request.method in {'POST','PUT','PATCH','DELETE'}:
+        expected = session.get('_csrf','')
+        supplied = request.form.get('_csrf','') or request.headers.get('X-CSRF-Token','')
+        if not expected or not secrets.compare_digest(expected, supplied):
+            abort(400, 'Jeton de sécurité invalide. Rechargez la page.')
 
 def admin_count():
     with db() as c:
@@ -477,6 +489,8 @@ def api_authorized():
     return bool(supplied) and secrets.compare_digest(expected, supplied)
 
 @app.route('/api/sync/vehicles', methods=['POST'])
+@app.route('/api/vehicles/sync', methods=['POST'])
+@app.route('/api/vehicles', methods=['POST'])
 def api_sync_vehicles():
     if not api_authorized(): abort(401)
     payload = request.get_json(silent=True) or {}
@@ -496,12 +510,43 @@ def api_sync_vehicles():
             updated += 1
     return {'status':'ok','updated':updated}
 
+@app.route('/api/sync/locations', methods=['POST'])
+@app.route('/api/locations/sync', methods=['POST'])
+@app.route('/api/locations', methods=['POST'])
+def api_sync_locations():
+    if not api_authorized(): abort(401)
+    payload = request.get_json(silent=True) or {}
+    items = payload.get('locations') or []
+    if not isinstance(items, list) or len(items) > 20000: abort(400)
+    cleaned = []
+    for item in items:
+        code = str(item.get('code_location','')).strip()[:80]
+        vehicle = str(item.get('code_vehicule','')).strip()[:80]
+        dep = str(item.get('date_depart','')).strip()[:30]
+        ret = str(item.get('date_retour','')).strip()[:30]
+        if vehicle and dep and ret:
+            cleaned.append((code, vehicle, dep, ret))
+    # GestionPro est la source de vérité pour les contrats de location.
+    # On remplace uniquement la table miroir 'locations'; les réservations,
+    # comptes admin, médias et réglages Web restent intacts.
+    with db() as c:
+        c.execute('DELETE FROM locations')
+        c.executemany('INSERT INTO locations(code_location,code_vehicule,date_depart,date_retour) VALUES(?,?,?,?)', cleaned)
+    return {'status':'ok','updated':len(cleaned)}
+
 @app.route('/api/sync/reservations', methods=['GET'])
+@app.route('/api/reservations/sync', methods=['GET'])
+@app.route('/api/reservations', methods=['GET'])
 def api_sync_reservations():
     if not api_authorized(): abort(401)
     with db() as c:
         rows = c.execute('SELECT * FROM reservations ORDER BY id').fetchall()
     return {'status':'ok','reservations':[dict(r) for r in rows]}
+
+@app.route('/api/sync/status', methods=['GET'])
+def api_sync_status():
+    if not api_authorized(): abort(401)
+    return {'status':'ok','service':'GestionPro Web','api':'sync','version':'2026-09-10'}
 
 @app.route('/health')
 def health():
