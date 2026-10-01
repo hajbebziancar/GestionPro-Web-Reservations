@@ -1,0 +1,49 @@
+HBZ — SIGNATURE À DISTANCE RECTO / VERSO
+
+CONTENU
+Site existant conservé : réservations, véhicules, administration et API de synchronisation.
+Ajouts : lecture et téléchargement du contrat avant signature, dessin au doigt ou stylet,
+accord explicite sur recto/verso, confirmation, signature sur les deux faces,
+PDF complet téléchargeable, récupération du PDF par Gestion Pro V96.
+Le verso reprend la feuille bilingue des conditions de Gestion Pro.
+Une signature unique est appliquée aux deux faces après confirmation du client.
+Ce parcours ne comprend pas de code SMS de vérification d'identité.
+
+IMPORTANT — ORDRE D'INSTALLATION
+Ne pas remplacer les fichiers GitHub avant de préparer les données persistantes.
+Le service actuel utilise /gestion.db et /app/static/uploads/vehicules.
+Une mise à jour de conteneur peut supprimer les données non stockées sur un volume.
+Garder sur le PC les sauvegardes gestion.db et photos_vehicules.tar.gz.
+Récupérer une sauvegarde récente si de nouvelles réservations ont été reçues.
+Ne jamais publier gestion.db, .secret_key ou les jetons API sur GitHub.
+
+1. Préparer un volume Railway pour ce service, monté sur /data.
+   Cette opération peut redémarrer le service : vérifier les sauvegardes au préalable.
+2. Restaurer les sauvegardes sur le volume :
+   /data/gestion.db
+   /data/uploads/vehicules/ (les photos extraites de l'archive)
+   /data/.secret_key (facultatif : conserve les sessions existantes).
+   Le script restore_data.py permet une restauration depuis les fichiers téléchargés
+   et refuse d'écraser une base existante. L'exécuter uniquement sur une destination vide.
+3. Définir GESTIONPRO_DATA_DIR=/data et GESTIONPRO_WEB_DB=/data/gestion.db.
+   Conserver la valeur actuelle de GESTIONPRO_API_TOKEN (ne pas la partager ici).
+   HBZ_SIGNATURE_DATA_DIR peut rester absent : le chemin sera /data/signature_data.
+   COOKIE_SECURE=1 pour le site HTTPS.
+4. Importer les fichiers de ce dossier à la RACINE du dépôt GitHub existant.
+   Le Dockerfile installe Chromium et les polices nécessaires.
+   Ne pas importer le ZIP lui-même ni créer un sous-dossier dans le dépôt.
+5. Déployer puis vérifier /health, le compte administrateur, les réservations et les photos.
+6. Dans Gestion Pro V96, vérifier l'adresse HTTPS du site et le jeton de synchronisation.
+   Créer un contrat TEST et son QR/lien de signature. Ouvrir avec un téléphone en 4G,
+   lire les deux faces, signer, cocher l'accord et confirmer. Télécharger le PDF signé.
+   Vérifier les deux pages et les deux signatures, puis la réception dans l'historique
+   Gestion Pro. Un contrat signé est figé et ne peut pas être remplacé depuis le lien.
+   Les liens expirent après 7 jours ; conserver les copies archivées dans Gestion Pro.
+
+VÉRIFICATIONS LOCALES
+Tests réalisés avec une base temporaire, le modèle 1 de Gestion Pro et un vrai
+moteur Chromium : login existant, photos, CSRF, API Bearer, consultation, PDF avant
+signature, refus de signature vide, consentement, PDF de 2 pages avec signature
+au recto et au verso, récupération identique, immutabilité, journal et expiration.
+Le Dockerfile et le parcours sur le site Railway réel restent à vérifier après installation.
+Documentation volume : https://docs.railway.com/volumes

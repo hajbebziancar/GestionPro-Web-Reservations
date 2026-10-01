@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash, abort
+from flask import Flask, render_template, request, redirect, url_for, session, flash, abort, send_from_directory
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from functools import wraps
@@ -7,10 +7,13 @@ from datetime import datetime, date
 import sqlite3, secrets, os, re, uuid
 
 ROOT = Path(__file__).resolve().parent.parent
-DB_PATH = Path(os.environ.get('GESTIONPRO_WEB_DB', str(ROOT / 'gestion.db'))).expanduser().resolve()
+DATA_DIR = Path(os.environ['GESTIONPRO_DATA_DIR']).expanduser().resolve() if os.environ.get('GESTIONPRO_DATA_DIR') else None
+DB_PATH = Path(os.environ.get('GESTIONPRO_WEB_DB', str(DATA_DIR / 'gestion.db') if DATA_DIR else str(ROOT / 'gestion.db'))).expanduser().resolve()
+DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 SITE_DIR = Path(__file__).resolve().parent
-SECRET_FILE = SITE_DIR / '.secret_key'
-UPLOAD_DIR = SITE_DIR / 'static' / 'uploads' / 'vehicules'
+SECRET_FILE = (DATA_DIR or SITE_DIR) / '.secret_key'
+SECRET_FILE.parent.mkdir(parents=True, exist_ok=True)
+UPLOAD_DIR = (DATA_DIR / 'uploads' / 'vehicules') if DATA_DIR else SITE_DIR / 'static' / 'uploads' / 'vehicules'
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 if SECRET_FILE.exists():
@@ -25,7 +28,7 @@ app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='Lax',
     SESSION_COOKIE_SECURE=os.environ.get('COOKIE_SECURE','0') == '1',
-    MAX_CONTENT_LENGTH=6 * 1024 * 1024,
+    MAX_CONTENT_LENGTH=20 * 1024 * 1024,
 )
 
 STATUS_ALLOWED = {'EN ATTENTE','CONFIRMEE','ANNULEE'}
@@ -102,7 +105,7 @@ app.jinja_env.globals['current_year'] = datetime.now().year
 def csrf_protect():
     # Les routes API GestionPro utilisent leur propre authentification Bearer.
     # Elles ne doivent pas être bloquées par le CSRF des formulaires Web.
-    if request.path.startswith('/api/'):
+    if request.path.startswith('/api/') or request.endpoint == 'remote_signatures.save':
         return
 
     if request.method in {'POST','PUT','PATCH','DELETE'}:
@@ -555,6 +558,15 @@ def health():
         return {'status':'ok','database':str(DB_PATH.name)}, 200
     except Exception:
         return {'status':'error'}, 500
+
+
+
+@app.get('/static/uploads/vehicules/<path:filename>')
+def persistent_vehicle_photo(filename):
+    return send_from_directory(UPLOAD_DIR, filename)
+
+from remote_signatures import bp as signature_blueprint
+app.register_blueprint(signature_blueprint)
 
 if __name__ == '__main__':
     print('\nGestionPro Web - HBZ Rent Car')
