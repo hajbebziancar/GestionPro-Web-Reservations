@@ -32,10 +32,23 @@ def render_pdf(content):
     import html
     meta='<meta http-equiv="Content-Security-Policy" content="'+html.escape(policy,quote=True)+'">'
     content=re.sub(r'<head\b[^>]*>',lambda m:m[0]+meta,content,count=1,flags=re.I) if re.search(r'<head\b',content,re.I) else '<head>'+meta+'</head>'+content
-    with tempfile.TemporaryDirectory() as td:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as td:
         source=Path(td)/'contrat.html';pdf=Path(td)/'contrat.pdf';source.write_text(content,encoding='utf-8')
         try:
-            result=subprocess.run([browser,'--headless','--no-sandbox','--disable-gpu','--disable-dev-shm-usage','--disable-background-networking','--no-first-run','--no-pdf-header-footer','--user-data-dir='+str(Path(td)/'profile'),'--print-to-pdf='+str(pdf),source.as_uri()],capture_output=True,timeout=45)
+            command=[browser,'--headless','--no-sandbox','--disable-gpu','--disable-dev-shm-usage','--disable-background-networking','--no-first-run','--no-pdf-header-footer','--user-data-dir='+str(Path(td)/'profile'),'--print-to-pdf='+str(pdf),source.as_uri()]
+            process=subprocess.Popen(command,stdout=subprocess.PIPE,stderr=subprocess.PIPE,start_new_session=(os.name=='posix'))
+            try:
+                stdout,stderr=process.communicate(timeout=45)
+                result=subprocess.CompletedProcess(command,process.returncode,stdout,stderr)
+            finally:
+                # Chromium peut laisser un sous-processus écrire dans son profil
+                # après création du PDF : l'arrêter avant le nettoyage.
+                if os.name=='posix':
+                    import signal
+                    try:os.killpg(process.pid,signal.SIGKILL)
+                    except ProcessLookupError:pass
+                elif process.poll() is None:process.kill()
+                if process.poll() is None:process.communicate()
         except subprocess.TimeoutExpired:raise RuntimeError('La conversion PDF a dépassé le délai. Réessayez.')
         if result.returncode or not pdf.is_file():raise RuntimeError('Le PDF signé n’a pas pu être créé.')
         from pypdf import PdfReader
