@@ -7,12 +7,20 @@ bp=Blueprint('remote_signatures',__name__)
 DATA=Path(os.environ.get('HBZ_SIGNATURE_DATA_DIR',str(Path(os.environ.get('GESTIONPRO_DATA_DIR',str(Path(__file__).resolve().parent))) / 'signature_data')))
 _lock=threading.Lock()
 
+from contextlib import contextmanager
+
+@contextmanager
 def db():
-    DATA.mkdir(parents=True,exist_ok=True)
-    c=sqlite3.connect(DATA/'sessions.sqlite',timeout=25);c.row_factory=sqlite3.Row
-    c.execute('CREATE TABLE IF NOT EXISTS signatures(token TEXT PRIMARY KEY,contract_no TEXT,clients TEXT,expires REAL,original TEXT,signed TEXT,png BLOB,pdf BLOB,signed_at TEXT)')
-    c.execute('CREATE TABLE IF NOT EXISTS signature_audit(token TEXT PRIMARY KEY, accepted_at TEXT NOT NULL, document_sha256 TEXT NOT NULL, ip TEXT, user_agent TEXT)')
-    return c
+    DATA.mkdir(parents=True, exist_ok=True)
+    c = sqlite3.connect(DATA / 'sessions.sqlite', timeout=25)
+    c.row_factory = sqlite3.Row
+    try:
+        c.execute('CREATE TABLE IF NOT EXISTS signatures(token TEXT PRIMARY KEY,contract_no TEXT,clients TEXT,expires REAL,original TEXT,signed TEXT,png BLOB,pdf BLOB,signed_at TEXT)')
+        c.execute('CREATE TABLE IF NOT EXISTS signature_audit(token TEXT PRIMARY KEY,accepted_at TEXT NOT NULL,document_sha256 TEXT NOT NULL,ip TEXT,user_agent TEXT)')
+        with c:
+            yield c
+    finally:
+        c.close()
 
 def authorized():
     secret=(os.environ.get('GESTIONPRO_API_TOKEN') or os.environ.get('HBZ_WEB_SYNC_TOKEN','')).strip()
