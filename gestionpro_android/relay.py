@@ -138,7 +138,15 @@ class Relay:
                         old=c.execute('SELECT payload FROM ops WHERE id=?',(op['id'],)).fetchone()
                         serial=json.dumps(op,sort_keys=True,ensure_ascii=False)
                         if old:
-                            if json.loads(old[0])!=op:raise ValueError('Identifiant réutilisé avec un contenu différent.')
+                            server_op=json.loads(old[0])
+                            # A remote signature legitimately enriches the server copy while the
+                            # phone can still hold the original unsigned operation. Preserve the
+                            # signed server copy instead of rejecting the next synchronization.
+                            if server_op!=op:
+                                same_unsigned=(op.get('kind')=='contract_create' and
+                                    not op.get('signature') and bool(server_op.get('signature')) and
+                                    all(op.get(k)==server_op.get(k) for k in ('id','kind','record','frozen')))
+                                if not same_unsigned:raise ValueError('Identifiant réutilisé avec un contenu différent.')
                         else:c.execute('INSERT INTO ops(id,payload,created) VALUES(?,?,?)',(op['id'],serial,time.time()))
                     return 200,self.view(c)
                 if path=='/api/pc-exchange':
