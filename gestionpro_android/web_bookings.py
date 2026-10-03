@@ -1,5 +1,5 @@
 """Pont local entre les réservations publiques et le relais mobile/PC."""
-import os,sqlite3
+import os,sqlite3,base64,hashlib
 from pathlib import Path
 ROOT=Path(__file__).resolve().parent.parent
 
@@ -48,6 +48,18 @@ def sync_fleet(snapshot):
             for v in snapshot.get('vehicles',[]):
                 if v.get('service')!=1:continue
                 c.execute("INSERT INTO vehicules(code_vehicule,marque,immatriculation,num_chassis,compteur,service,prix_jour) VALUES(?,?,?,?,?,'EN SERVICE',?) ON CONFLICT(code_vehicule) DO UPDATE SET marque=excluded.marque,immatriculation=excluded.immatriculation,num_chassis=excluded.num_chassis,compteur=excluded.compteur,service=excluded.service,prix_jour=excluded.prix_jour",(v['code'],v.get('modele',''),v.get('immatriculation',''),v.get('chassis',''),v.get('compteur',0),v.get('prix',0)))
+            if c.execute("SELECT 1 FROM sqlite_master WHERE name='web_vehicle_media'").fetchone():
+                folder=Path(os.environ['GESTIONPRO_DATA_DIR'])/'uploads'/'vehicules' if os.environ.get('GESTIONPRO_DATA_DIR') else ROOT/'static'/'uploads'/'vehicules'
+                folder.mkdir(parents=True,exist_ok=True)
+                for v in snapshot.get('vehicles',[]):
+                    uri=v.get('photo_uri','')
+                    if v.get('service')!=1 or not uri.startswith(('data:image/jpeg;base64,','data:image/png;base64,')):continue
+                    raw=base64.b64decode(uri.split(',',1)[1],validate=True)
+                    if len(raw)>1_500_000:continue
+                    suffix='.png' if uri.startswith('data:image/png') else '.jpg'
+                    filename='pc_'+hashlib.sha256(v['code'].encode()).hexdigest()[:24]+suffix
+                    temp=folder/(filename+'.tmp');temp.write_bytes(raw);os.replace(temp,folder/filename)
+                    c.execute('INSERT OR REPLACE INTO web_vehicle_media(code_vehicule,image_filename,updated_at) VALUES(?,?,CURRENT_TIMESTAMP)',(v['code'],filename))
             if c.execute("SELECT 1 FROM sqlite_master WHERE name='locations'").fetchone():
                 c.execute('DELETE FROM locations')
                 active={v['code'] for v in snapshot.get('vehicles',[]) if v.get('service')==1}

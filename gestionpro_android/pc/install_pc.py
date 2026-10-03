@@ -21,9 +21,12 @@ try:
         if (target/filename).exists():shutil.copy2(target/filename,backup/filename)
     if marker not in text:
         if text.count(needle)!=1:raise ValueError('Version de main.py non reconnue. Aucune modification effectuée.')
-        new=text.replace(needle,needle+'\n        '+marker+'\n        start_mobile_sync(APP_DIR)',1)
+        new=text.replace(needle,needle+'\n        '+marker+'\n        start_mobile_sync(APP_DIR,self)',1)
         ast.parse(new)
         main.write_text(new,encoding='utf-8')
+    elif 'start_mobile_sync(APP_DIR)' in text:
+        new=text.replace('start_mobile_sync(APP_DIR)','start_mobile_sync(APP_DIR,self)')
+        ast.parse(new);main.write_text(new,encoding='utf-8')
     shutil.copy2(Path(__file__).with_name('mobile_sync.py'),target/'mobile_sync.py')
     (target/'mobile_sync_config.json').write_text(json.dumps({'base_url':url.rstrip('/'),'pc_token':token},ensure_ascii=False,indent=2),encoding='utf-8')
     messagebox.showinfo('Installation terminée','Fermez puis relancez Gestion Pro avec son lanceur habituel.\nLa synchronisation fonctionnera en arrière-plan sans fenêtre noire supplémentaire.\nLe téléphone pourra travailler quand le PC est éteint.')

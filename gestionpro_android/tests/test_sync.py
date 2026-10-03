@@ -75,7 +75,10 @@ class SyncTests(unittest.TestCase):
             saved=json.loads(c.execute('SELECT payload FROM module_records WHERE module="maintenance"').fetchone()[0]);self.assertEqual(saved['amount'],'500')
     def test_signature_remote_one_time_and_unsigned_wait(self):
         self.call('/mobile/api/sync',{'operations':[self.customer(),self.contract(False)]});self.sync()
-        with db(self.path) as c:self.assertEqual(c.execute('SELECT COUNT(*) FROM contracts').fetchone()[0],0)
+        with db(self.path) as c:self.assertEqual(c.execute('SELECT COUNT(*) FROM contracts').fetchone()[0],1)
+        self.sync() # Retry before signature must not duplicate or reject the draft.
+        status,view=self.call('/mobile/api/sync',{'operations':[]})
+        self.assertTrue(view['operations'][-1]['pc_received'])
         status,j=self.call('/mobile/api/invite',{'op_id':'op-contract-001'});self.assertEqual(status,200)
         raw=json.dumps({'signature':'data:image/png;base64,'+PNG,'pdf':PDF}).encode();env={'PATH_INFO':'/mobile/signature/'+j['token']+'/save','REQUEST_METHOD':'POST','CONTENT_LENGTH':str(len(raw)),'wsgi.input':io.BytesIO(raw)}
         result=self.relay.route(env);self.assertEqual(result[0],200)
@@ -93,4 +96,19 @@ class SyncTests(unittest.TestCase):
         tampered=self.contract();tampered['record']['reglement']=0
         self.call('/mobile/api/sync',{'operations':[duplicate,tampered]});self.sync()
         with db(self.path) as c:self.assertEqual(c.execute('SELECT COUNT(*) FROM clients').fetchone()[0],1);self.assertEqual(c.execute('SELECT COUNT(*) FROM contracts').fetchone()[0],0)
-if __name__=='__main__':unittest.main(verbosity=2)
+
+    def test_archive_from_pc_and_signed_whatsapp_link(self):
+        self.call('/mobile/api/sync',{'operations':[self.customer(),self.contract()]});self.sync()
+        status,req=self.call('/mobile/api/contract-document',{'numero':'MCT-001'})
+        self.assertEqual(status,200);self.assertTrue(req['pending'])
+        self.sync()
+        status,doc=self.call('/mobile/api/contract-document',{'numero':'MCT-001'})
+        self.assertEqual(status,200);self.assertTrue(base64.b64decode(doc['document']['pdf']).startswith(b'%PDF-'))
+        status,link=self.call('/mobile/api/share-contract',{'numero':'MCT-001'})
+        self.assertEqual(status,200)
+        status,data=self.relay.route({'PATH_INFO':'/mobile/signature/'+link['token']+'/data','REQUEST_METHOD':'GET'})
+        self.assertTrue(data['signed']);self.assertTrue(data['pdf'])
+        raw=json.dumps({'signature':'data:image/png;base64,'+PNG}).encode()
+        with self.assertRaises(ValueError):self.relay.route({'PATH_INFO':'/mobile/signature/'+link['token']+'/save','REQUEST_METHOD':'POST','CONTENT_LENGTH':str(len(raw)),'wsgi.input':io.BytesIO(raw)})
+
+if __name__=='__main__':unittest.main()

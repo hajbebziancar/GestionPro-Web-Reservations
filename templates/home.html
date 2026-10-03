@@ -24,6 +24,8 @@
       <div class="vehicle-photo">
         {% if media.get(v.code_vehicule) %}<img src="{{ url_for('static', filename='uploads/vehicules/' + media.get(v.code_vehicule)) }}" alt="{{v.marque}}">
         {% else %}<div class="vehicle-placeholder"><span>HBZ</span><small>RENT CAR</small></div>{% endif %}
+        {% set brand = (v.marque or '')|lower %}
+        {% for name in ['peugeot','dacia','citroen','volkswagen','opel','renault'] %}{% if name in brand|replace('ë','e')|replace('é','e') %}<img class="fleet-brand-logo" src="/mobile/brands/{{name}}.{{'png' if name in ['peugeot','dacia'] else 'svg'}}" alt="Logo {{name}}">{% endif %}{% endfor %}
         <span class="availability-badge">En service</span>
       </div>
       <div class="vehicle-body">
@@ -65,3 +67,4 @@
 document.querySelectorAll('.vehicle-select').forEach(function(a){a.addEventListener('click',function(){var s=document.getElementById('vehicleSelect'); if(s){s.value=this.dataset.code;}})});
 </script>
 {% endblock %}
+<style>.vehicle-photo img.fleet-brand-logo{position:absolute;right:12px;bottom:12px;width:54px;height:54px;object-fit:contain;background:white;padding:6px;border-radius:10px}</style>

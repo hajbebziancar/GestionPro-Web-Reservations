@@ -18,6 +18,7 @@ class Relay:
         with self.connect() as c:
             c.executescript('''CREATE TABLE IF NOT EXISTS state(id INTEGER PRIMARY KEY CHECK(id=1),payload TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS ops(id TEXT PRIMARY KEY,payload TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'pending',message TEXT NOT NULL DEFAULT '',created REAL NOT NULL);
+            CREATE TABLE IF NOT EXISTS document_requests(numero TEXT PRIMARY KEY,payload TEXT,status TEXT NOT NULL DEFAULT 'pending');
             CREATE TABLE IF NOT EXISTS invites(token TEXT PRIMARY KEY,op_id TEXT NOT NULL,expires REAL NOT NULL,used INTEGER NOT NULL DEFAULT 0);''')
             c.execute('INSERT OR IGNORE INTO state VALUES(1,?)',(json.dumps({'clients':[],'vehicles':[],'contracts':[],'reservations':[],'maintenance':[],'expenses':[],'checks':[],'finance':[],'settings':{},'pc_at':None}),))
     @contextmanager
@@ -53,6 +54,9 @@ class Relay:
         web=bookings()
         existing={r['reference'] for r in snapshot['reservations']}
         snapshot['reservations'] += [r for r in web if r['reference'] not in existing]
+        drafts={r['op_id'] for r in snapshot.get('mobile_contract_drafts',[])}
+        for op in ops:
+            if op['id'] in drafts:op['pc_received']=True
         snapshot['operations']=ops
         return snapshot
     def validate(self,op):
@@ -100,6 +104,27 @@ class Relay:
                 return 200,{**summary(data,p.get('start'),p.get('end'),True),'pc_at':data.get('pc_at')}
             with self.connect() as c:
                 c.execute('BEGIN IMMEDIATE')
+                if path=='/api/contract-document':
+                    number=str(p.get('numero',''))
+                    snapshot=json.loads(c.execute('SELECT payload FROM state WHERE id=1').fetchone()[0])
+                    if not any(r['numero']==number for r in snapshot['contracts']):raise ValueError('Contrat absent du PC.')
+                    row=c.execute('SELECT * FROM document_requests WHERE numero=?',(number,)).fetchone()
+                    if not row:
+                        c.execute('INSERT INTO document_requests(numero) VALUES(?)',(number,))
+                        return 200,{'pending':True,'message':'Demande envoyée. Laissez Gestion Pro ouvert sur le PC, puis synchronisez le téléphone et réessayez dans une minute.'}
+                    if row['status']=='pending':return 200,{'pending':True,'message':'Archive en attente du PC. Vérifiez sa connexion et sa synchronisation.'}
+                    doc=json.loads(row['payload'])
+                    if doc.get('error'):raise ValueError(doc['error'])
+                    number=doc['numero'];record=next(r for r in snapshot['contracts'] if r['numero']==number)
+                    frozen={'record':record,'client':next(r for r in snapshot['clients'] if r['code']==record['client_code']),'vehicle':next((r for r in snapshot['vehicles']+snapshot.get('contract_vehicles',[]) if r['code']==record['vehicle_code']),{'modele':record['vehicle_code']}),'settings':snapshot['settings'],'created_at':record.get('created_at')}
+                    if not doc.get('pdf'):
+                        from remote_signatures import render_pdf
+                        from remote_contract_common import ensure_verso
+                        doc['pdf']=base64.b64encode(render_pdf(ensure_verso(doc['html']))).decode()
+                        c.execute('UPDATE document_requests SET payload=? WHERE numero=?',(json.dumps(doc,ensure_ascii=False),number))
+                    op={'id':'pc-archive-'+hashlib.sha256(number.encode()).hexdigest()[:32],'kind':'contract_create','record':record,'frozen':frozen,'signature':doc['signature'],'pdf':doc['pdf'],'document_html':doc['html']}
+                    c.execute("INSERT INTO ops(id,payload,status,message,created) VALUES(?,?,'applied','Archive signée récupérée du PC',?) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload",(op['id'],json.dumps(op,ensure_ascii=False),time.time()))
+                    return 200,{'document':op}
                 if path=='/api/sync':
                     incoming=p.get('operations',[])
                     if not isinstance(incoming,list) or len(incoming)>50:raise ValueError('Maximum 50 opérations par échange.')
@@ -117,6 +142,12 @@ class Relay:
                         else:c.execute('INSERT INTO ops(id,payload,created) VALUES(?,?,?)',(op['id'],serial,time.time()))
                     return 200,self.view(c)
                 if path=='/api/pc-exchange':
+                    for doc in p.get('documents',[]):
+                        if not isinstance(doc,dict) or len(json.dumps(doc))>8_000_000:raise ValueError('Archive invalide ou trop volumineuse.')
+                        number=doc.get('numero')
+                        if not c.execute('SELECT 1 FROM document_requests WHERE numero=?',(number,)).fetchone():raise ValueError('Archive non demandée.')
+                        if not doc.get('error') and (not doc.get('html') or not str(doc.get('signature','')).startswith('data:image/png;base64,')):raise ValueError('Archive signée incomplète.')
+                        c.execute("UPDATE document_requests SET payload=?,status='received' WHERE numero=?",(json.dumps(doc,ensure_ascii=False),number))
                     for item in p.get('results',[]):
                         if item.get('status') not in ('applied','rejected'):raise ValueError('Statut PC invalide.')
                         c.execute("UPDATE ops SET status=?,message=? WHERE id=? AND status='pending'",(item['status'],str(item.get('message',''))[:1000],item['id']))
@@ -141,10 +172,15 @@ class Relay:
                                 updated={**old,'status':r['status']}
                                 change_id='web-status-'+hashlib.sha256(json.dumps([r['reference'],old,r['status'],s.get('pc_at')],sort_keys=True).encode()).hexdigest()[:40]
                                 pending.append({'id':change_id,'kind':'reservation_update','original':old,'record':updated,'trusted_web':True})
-                    return 200,{'pending':pending}
+                    return 200,{'pending':pending,'document_requests':[r[0] for r in c.execute("SELECT numero FROM document_requests WHERE status='pending' ORDER BY rowid LIMIT 1")]}
+                if path=='/api/share-contract':
+                    row=next((r for r in c.execute('SELECT * FROM ops ORDER BY created DESC,id DESC') if json.loads(r['payload']).get('record',{}).get('numero')==p.get('numero') and json.loads(r['payload']).get('signature')),None)
+                    if not row:raise ValueError('Synchronisez le contrat signé avant de le partager.')
+                    token=secrets.token_urlsafe(32);c.execute('INSERT INTO invites VALUES(?,?,?,1)',(token,row['id'],time.time()+172800))
+                    return 200,{'token':token}
                 if path=='/api/invite':
                     row=c.execute('SELECT * FROM ops WHERE id=?',(p.get('op_id'),)).fetchone()
-                    if not row or row['status']!='pending':raise ValueError('Le contrat doit être en attente de signature avant son transfert au PC.')
+                    if not row or row['status']!='pending':raise ValueError('Le contrat doit être en attente de signature.')
                     op=json.loads(row['payload'])
                     if op['kind']!='contract_create' or op.get('signature'):raise ValueError('Contrat déjà signé ou invalide.')
                     token=secrets.token_urlsafe(32);c.execute('INSERT INTO invites VALUES(?,?,?,0)',(token,op['id'],time.time()+172800))

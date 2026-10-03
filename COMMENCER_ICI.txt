@@ -1,3 +1,58 @@
+CORRECTIF SYNCHRONISATION, CONTRATS ET VÉHICULES — 03/10/2026
+
+IMPORTANT : cette mise à jour s’installe sur RAILWAY ET SUR LE PC.
+1. Décompressez le ZIP et déposez le contenu du dossier GestionPro-Web-Reservations-main
+   à la racine du dépôt GitHub EXISTANT. Attendez le déploiement réussi sur Railway.
+2. Fermez Gestion Pro sur le PC. Dans le dossier décompressé, lancez
+   gestionpro_android/INSTALLER_PC.bat. Choisissez le dossier de votre application PC
+   habituelle contenant main.py ET sa base gestionpro_hbz.db.
+   Adresse : https://gestionpro-web-reservations-production.up.railway.app/mobile/
+   Clé PC : la valeur EXISTANTE de GP_PC_TOKEN dans Railway (pas GP_MOBILE_TOKEN).
+   L’installateur conserve une sauvegarde des fichiers modifiés.
+3. Relancez Gestion Pro par votre lanceur habituel. Gardez le PC connecté à Internet.
+4. Fermez toutes les pages / fenêtres de l’application téléphone, rouvrez puis touchez
+   Synchronisation. Gardez PC et téléphone ouverts une à deux minutes.
+   N’effacez pas les données du téléphone : elles peuvent contenir des contrats non envoyés.
+
+CE QUI CHANGE
+- Un contrat enregistré en mode « signature à distance » arrive sur le PC avant signature.
+  Son statut mobile indique « Reçu sur le PC · Signature attendue » lorsque le PC l’a reçu.
+  Le véhicule est déjà réservé par ce contrat ; il compte dans les locations / finances PC.
+  La signature reçue complète le MÊME contrat, sans doublon.
+- Consultez le contrat avant signature, puis le PDF signé après signature ; téléchargement
+  et impression depuis les boutons PDF. Modèle Gestion Pro recto verso conservé.
+- WhatsApp ouvre le numéro enregistré dans la fiche client avec un message et un lien
+  de consultation / téléchargement du PDF signé valable 48 heures. Vous validez l’envoi
+  dans WhatsApp. Pour envoyer une pièce jointe, téléchargez le PDF puis joignez-le.
+- Contrats et dernières locations : plus récents en premier.
+  Contrats > Table de location : client, véhicule, dates / heures de départ et retour,
+  numéro et accès au contrat. La recherche peut filtrer cette table.
+- Photos véhicule chargées depuis la fiche PC, visibles sur le téléphone et le site.
+  Logos fournis pour les marques du parc ; pour une autre marque, placez son PNG ou JPG
+  dans logos_marques/ du dossier PC, nommé par le premier mot du modèle en minuscules.
+  Les marques inconnues gardent leur nom, sans emblème inventé.
+- Les anciennes copies signées du PC sont récupérables à la demande : ouvrez le contrat,
+  touchez « Récupérer le contrat signé du PC », attendez la synchronisation du PC puis
+  touchez à nouveau le bouton. Il faut une archive dans contrats_signes/ sur le PC.
+  Une signature absente des archives ne peut pas être recréée automatiquement.
+
+SI UN CONTRAT N’ARRIVE PAS
+Consultez Synchronisation sur le téléphone : date des dernières données PC et message
+« À corriger » éventuel. Si cette date ne change pas, vérifiez le dossier choisi lors
+ de l’installation et la clé PC, puis ouvrez mobile_sync_status.json dans ce dossier.
+Ne partagez pas mobile_sync_config.json : ce fichier contient votre clé PC.
+Un contrat rejeté pour conflit, client modifié ou véhicule indisponible nécessite une
+nouvelle saisie avec les données actualisées ; il n’est pas importé de force.
+Les changements GitHub seuls ne mettent PAS à jour le synchroniseur installé sur le PC.
+
+TEST DE RÉCEPTION
+Choisissez un client existant et un véhicule libre, enregistrez un contrat en mode
+signature à distance. Vérifiez son numéro dans l’historique PC. Envoyez son lien,
+signez-le puis synchronisez : même numéro, une seule ligne et archive PDF signée.
+Testez ensuite le bouton WhatsApp avec le numéro enregistré du client.
+
+--- Guide initial du site et de l’application ---
+
 GESTION PRO — MISE À JOUR SITE + ANDROID — 03 OCTOBRE 2026
 
 Cette archive contient le site complet à déposer dans votre dépôt GitHub
@@ -60,7 +115,7 @@ CE QUI CHANGE
   Le client peut télécharger sa copie signée et la retélécharger durant la validité du lien.
   Le PDF et la signature sont récupérés et archivés sur le PC.
 - Réservations publiques : remontée vers le PC et le téléphone ; confirmation/annulation
-  dans la fiche ; bouton « Établir un contrat ». Après signature et import PC,
+  dans la fiche ; bouton « Établir un contrat ». Après import PC,
   la réservation d'origine est marquée terminée.
 - Tarification du site harmonisée sur les jours de Gestion Pro : différence entre les dates,
   avec un minimum d'un jour. Les heures de retour doivent suivre celles de départ.

@@ -23,6 +23,8 @@ def db(path):
 def module(c,name):
     return [{**json.loads(r[1]), '_record_id':r[0]} if name=='contract_payment_mode' else json.loads(r[1]) for r in c.execute('SELECT record_id,payload FROM module_records WHERE module=?',(name,))]
 def inline_picture(value,max_size=(800,800)):
+    value=str(value or '')
+    if not value:return ''
     try:
         from PIL import Image
         import io
@@ -34,10 +36,18 @@ def inline_picture(value,max_size=(800,800)):
         with Image.open(path) as im:
             im=im.convert('RGB');im.thumbnail(max_size);out=io.BytesIO();im.save(out,'JPEG',quality=85)
         return 'data:image/jpeg;base64,'+base64.b64encode(out.getvalue()).decode()
-    except (OSError,ValueError):return ''
+    except (OSError,ValueError,ImportError):
+        try:
+            path=Path(value) if Path(value).is_absolute() else ROOT/value
+            if path.is_file() and path.suffix.lower() in ('.png','.jpg','.jpeg') and path.stat().st_size<350000:
+                return 'data:image/'+('png' if path.suffix.lower()=='.png' else 'jpeg')+';base64,'+base64.b64encode(path.read_bytes()).decode()
+        except (OSError,ValueError):pass
+        return ''
 def vehicle_snapshot(c,row):
     v={**clean(dict(row),VEHICLE_FIELDS),**{k:row[k] for k in row.keys() if k in ('assurance_fin','controle_technique','prochaine_vidange','vidange_restant','prochaine_adblue','adblue_restant','prochaine_chaine','chaine_restant')}}
     v['photo_uri']=inline_picture(dict(row).get('photo',''))
+    brand=str(row['modele'] or '').split()[0].lower() if row['modele'] else ''
+    v['brand_logo_uri']=next((inline_picture(str(path)) for ext in ('.png','.jpg') if (path:=ROOT/'logos_marques'/(brand+ext)).is_file()),'')
     state=c.execute("SELECT payload FROM module_records WHERE module='vehicle_condition' AND record_id=?",(row['code'],)).fetchone()
     if state:
         v['condition']=json.loads(state[0]);v['condition']['drawing']=''
@@ -47,13 +57,17 @@ def snapshot(c):
     return {'clients':[clean(dict(r),CLIENT_FIELDS) for r in c.execute('SELECT * FROM clients')],
       'vehicles':[vehicle_snapshot(c,r) for r in c.execute('SELECT * FROM vehicles WHERE service=1')],
       'contracts':[dict(r) for r in c.execute('SELECT * FROM contracts')],
+      'contract_vehicles':[vehicle_snapshot(c,r) for r in c.execute('SELECT * FROM vehicles WHERE service<>1 AND code IN (SELECT vehicle_code FROM contracts)')],
       **{name:module(c,name) for name in ('reservations','maintenance','expenses','checks','finance','supplier_payments','transfers','payments','contract_payment_mode')},
+      'mobile_contract_drafts':module(c,'mobile_contract_draft'),
       'settings':dict(c.execute("SELECT setting_key,setting_value FROM app_settings WHERE setting_key IN ('company_name','company_address','company_phone','company_ice','company_email','company_tax_id','general_conditions','general_conditions_ar')"))}
-def available(c,code,start,end,ignore=''):
+def available(c,code,start,end,ignore='',ignore_contract=''):
     vehicle=c.execute('SELECT * FROM vehicles WHERE code=?',(code,)).fetchone()
     if not vehicle or vehicle['service']!=1:raise ValueError('Véhicule absent ou hors service sur le PC.')
     for raw in c.execute('SELECT * FROM contracts WHERE vehicle_code=?',(code,)):
-        r=dict(raw);status=str(r.get('return_status','')).upper()
+        r=dict(raw)
+        if r['numero']==ignore_contract:continue
+        status=str(r.get('return_status','')).upper()
         if any(x in status for x in ('RETOUR CONFIRM','ANTICIP','ANNUL')):continue
         a=date(r['date_depart'],r.get('heure_depart') or '00:00')
         b=datetime.max if 'RETARD CONFIRM' in status else date(r.get('actual_return_date') or r['date_retour'],r.get('actual_return_time') or r.get('heure_retour') or '23:59')
@@ -97,7 +111,6 @@ def resync_maintenance(c,code):
 def apply_one(c,op,root):
     old=c.execute('SELECT status,message FROM gp_mobile_receipts WHERE id=?',(op['id'],)).fetchone()
     if old:return {'id':op['id'],**dict(old)}
-    if op['kind']=='contract_create' and not op.get('signature'):return None # Wait for remote or local signature.
     status='applied';message='Enregistré sur le PC.'
     c.execute('SAVEPOINT mobile_op')
     try:
@@ -122,7 +135,14 @@ def apply_one(c,op,root):
             c.execute('UPDATE vehicles SET compteur=? WHERE code=?',(km,r['code']))
             resync_maintenance(c,r['code'])
         elif kind=='contract_create':
-            if c.execute('SELECT 1 FROM contracts WHERE numero=?',(r['numero'],)).fetchone():raise ValueError('Numéro de contrat déjà utilisé.')
+            existing=c.execute('SELECT * FROM contracts WHERE numero=?',(r['numero'],)).fetchone()
+            pending=c.execute("SELECT payload FROM module_records WHERE module='mobile_contract_draft' AND record_id=?",(r['numero'],)).fetchone()
+            prior=json.loads(pending[0]) if pending else None
+            if existing and (not prior or prior.get('op_id')!=op['id']):raise ValueError('Numéro de contrat déjà utilisé.')
+            if existing and prior.get('record')!=r:raise ValueError('Le contrat en attente a changé.')
+            if existing and any(existing[k]!=r.get(k) for k in ('client_code','vehicle_code','date_depart','heure_depart','date_retour','heure_retour','duree','prix','montant','reglement','reste','km_depart')):raise ValueError('Contrat modifié sur le PC : vérifiez avant signature.')
+            if existing and not op.get('signature'):
+                c.execute('RELEASE mobile_op');return None
             client=c.execute('SELECT * FROM clients WHERE code=?',(r['client_code'],)).fetchone()
             if not client:raise ValueError('Client absent sur le PC. Synchronisez sa fiche.')
             frozen=op['frozen']
@@ -130,24 +150,28 @@ def apply_one(c,op,root):
             if clean(dict(client),CLIENT_FIELDS)!=clean(frozen['client'],CLIENT_FIELDS):raise ValueError('Identité du client modifiée : refaire le contrat et sa signature.')
             start=date(r['date_depart'],r['heure_depart']);end=date(r['date_retour'],r['heure_retour'])
             if end<=start:raise ValueError('Retour antérieur au départ.')
-            vehicle=available(c,r['vehicle_code'],start,end,r.get('reservation_ref',''))
+            vehicle=available(c,r['vehicle_code'],start,end,r.get('reservation_ref',''),r['numero'] if existing else '')
             if any(str(vehicle.get(k,''))!=str(frozen['vehicle'].get(k,'')) for k in ('code','modele','immatriculation','chassis')):raise ValueError('Identité du véhicule modifiée : refaire le contrat et sa signature.')
             days=max(1,(end.date()-start.date()).days);price=money(r['prix']);paid=money(r['reglement']);total=round(days*price,2)
             if int(r['duree'])!=days or abs(money(r['montant'])-total)>.005 or paid>total or abs(money(r['reste'])-(total-paid))>.005:raise ValueError('Calcul du contrat invalide.')
-            if int(r['km_depart'])<int(vehicle.get('compteur') or 0):raise ValueError('Kilométrage de départ inférieur au compteur PC.')
+            if not existing and int(r['km_depart'])<int(vehicle.get('compteur') or 0):raise ValueError('Kilométrage de départ inférieur au compteur PC.')
             cols=('numero','client_code','second_code','vehicle_code','date_depart','heure_depart','date_retour','heure_retour','duree','prix','montant','reglement','reste','km_depart','km_retour','created_at')
             values={**r,'second_code':'','km_retour':0,'created_at':now}
-            c.execute('INSERT INTO contracts('+','.join(cols)+') VALUES('+','.join('?' for _ in cols)+')',[values[k] for k in cols])
+            if not existing:c.execute('INSERT INTO contracts('+','.join(cols)+') VALUES('+','.join('?' for _ in cols)+')',[values[k] for k in cols])
             c.execute('INSERT OR REPLACE INTO module_records(module,record_id,payload,created_at) VALUES(?,?,?,?)',('client_rapide_contract',r['numero'],json.dumps({'ref_notes':r.get('notes','')},ensure_ascii=False),now))
             reservation_ref=r.get('reservation_ref')
-            if reservation_ref:
+            if reservation_ref and not existing:
                 row=c.execute("SELECT payload FROM module_records WHERE module='reservations' AND record_id=?",(reservation_ref,)).fetchone()
                 if not row:raise ValueError('Réservation d’origine absente.')
                 res=json.loads(row[0])
                 if str(res.get('client','')).split('|')[0].strip()!=r['client_code'] or str(res.get('vehicle','')).split('|')[0].strip()!=r['vehicle_code']:raise ValueError('Le contrat ne correspond pas à la réservation.')
                 res['status']='TERMINÉ';res['contract_no']=r['numero']
                 c.execute("UPDATE module_records SET payload=? WHERE module='reservations' AND record_id=?",(json.dumps(res,ensure_ascii=False),reservation_ref))
-            archive(c,op,root)
+            if op.get('signature'):
+                archive(c,op,root)
+                c.execute("DELETE FROM module_records WHERE module='mobile_contract_draft' AND record_id=?",(r['numero'],))
+            else:
+                c.execute('INSERT INTO module_records VALUES(?,?,?,?)',('mobile_contract_draft',r['numero'],json.dumps({'op_id':op['id'],'record':r,'status':'SIGNATURE ATTENDUE'},ensure_ascii=False),now))
         elif kind.startswith(('reservation_','maintenance_')):
             name='reservations' if kind.startswith('reservation') else 'maintenance';reference=r['reference']
             prior=c.execute('SELECT payload FROM module_records WHERE module=? AND record_id=?',(name,reference)).fetchone()
@@ -184,25 +208,47 @@ def apply_one(c,op,root):
     except (ValueError,KeyError,TypeError,sqlite3.IntegrityError) as x:
         c.execute('ROLLBACK TO mobile_op');status='rejected';message=str(x)
     c.execute('RELEASE mobile_op')
+    if status=='applied' and op['kind']=='contract_create' and not op.get('signature'):return None
     c.execute('INSERT INTO gp_mobile_receipts VALUES(?,?,?,?)',(op['id'],status,message,json.dumps(op,ensure_ascii=False)))
     return {'id':op['id'],'status':status,'message':message}
 def exchange(base,token,payload):
     if not base.startswith('https://') and not base.startswith(('http://localhost:','http://127.0.0.1:')):raise ValueError('Adresse HTTPS obligatoire.')
     req=urllib.request.Request(base.rstrip('/')+'/api/pc-exchange',data=json.dumps(payload,ensure_ascii=False).encode(),headers={'Authorization':'Bearer '+token,'Content-Type':'application/json'},method='POST')
     with urllib.request.urlopen(req,timeout=30) as response:return json.load(response)
+def requested_documents(root,numbers):
+    result=[]
+    for number in numbers[:3]:
+        try:
+            folder=root/'contrats_signes'/hashlib.sha256(str(number).strip().encode()).hexdigest()[:24]
+            meta=json.loads((folder/'latest.json').read_text(encoding='utf-8'))
+            if meta['contract_no']!=number:raise ValueError('Archive différente.')
+            def local(name):
+                path=(folder/name).resolve()
+                if not path.is_relative_to(folder.resolve()) or path.stat().st_size>4_000_000:raise ValueError('Archive trop volumineuse.')
+                return path
+            html_text=local(meta['html']).read_text(encoding='utf-8')
+            png=local(meta['signature']).read_bytes()
+            item={'numero':number,'html':html_text,'signature':'data:image/png;base64,'+base64.b64encode(png).decode()}
+            if meta.get('pdf'):item['pdf']=base64.b64encode(local(meta['pdf']).read_bytes()).decode()
+            result.append(item)
+        except (OSError,ValueError,KeyError):result.append({'numero':number,'error':'Copie signée absente des archives du PC. Ouvrez et signez le contrat sur le PC ou le téléphone.'})
+    return result
+
 def sync_once(root=ROOT,transport=None):
     config=json.loads((root/'mobile_sync_config.json').read_text(encoding='utf-8'));send=transport or (lambda p:exchange(config['base_url'],config['pc_token'],p))
     with closing(db(root/'gestionpro_hbz.db')) as c:
         # Resend committed receipts even after a network interruption.
         receipts=[dict(r) for r in c.execute('SELECT id,status,message FROM gp_mobile_receipts')]
-        pending=send({'snapshot':snapshot(c),'results':receipts})['pending']
+        response=send({'snapshot':snapshot(c),'results':receipts})
+        pending=response['pending']
+        documents=requested_documents(root,response.get('document_requests',[]))
         for op in sorted(pending,key=lambda o:0 if o['kind'].startswith('client_') else 1 if o['kind']=='vehicle_update' else 2):
             c.execute('BEGIN IMMEDIATE');apply_one(c,op,root);c.commit()
         receipts=[dict(r) for r in c.execute('SELECT id,status,message FROM gp_mobile_receipts')]
-        send({'snapshot':snapshot(c),'results':receipts})
+        send({'snapshot':snapshot(c),'results':receipts,'documents':documents})
     return True
 _started=False
-def start(root=ROOT):
+def start(root=ROOT,app=None):
     global _started
     if _started:return
     _started=True
@@ -210,6 +256,12 @@ def start(root=ROOT):
         while True:
             try:
                 if (root/'mobile_sync_config.json').exists():sync_once(root)
+                if app is not None:
+                    def refresh():
+                        for name in ('refresh_clients','refresh_vehicles','refresh_contract_history','refresh_dashboard'):
+                            try:getattr(app,name)()
+                            except Exception:pass
+                    app.root.after(0,refresh)
                 status={'ok':True,'at':datetime.now().isoformat()}
             except Exception as x:status={'ok':False,'at':datetime.now().isoformat(),'error':str(x)}
             try:(root/'mobile_sync_status.json').write_text(json.dumps(status,ensure_ascii=False),encoding='utf-8')
