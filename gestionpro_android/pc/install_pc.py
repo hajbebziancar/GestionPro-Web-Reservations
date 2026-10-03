@@ -16,12 +16,13 @@ try:
     if not token:raise SystemExit()
     text=main.read_text(encoding='utf-8-sig');needle='        self._create_database()'
     marker='from mobile_sync import start as start_mobile_sync'
+    backup=target/('sauvegarde_avant_android_'+datetime.now().strftime('%Y%m%d_%H%M%S_%f'));backup.mkdir()
+    for filename in ('main.py','gestionpro_hbz.db','mobile_sync.py','mobile_sync_config.json'):
+        if (target/filename).exists():shutil.copy2(target/filename,backup/filename)
     if marker not in text:
         if text.count(needle)!=1:raise ValueError('Version de main.py non reconnue. Aucune modification effectuée.')
         new=text.replace(needle,needle+'\n        '+marker+'\n        start_mobile_sync(APP_DIR)',1)
         ast.parse(new)
-        backup=target/('sauvegarde_avant_android_'+datetime.now().strftime('%Y%m%d_%H%M%S'));backup.mkdir()
-        shutil.copy2(main,backup/'main.py');shutil.copy2(target/'gestionpro_hbz.db',backup/'gestionpro_hbz.db')
         main.write_text(new,encoding='utf-8')
     shutil.copy2(Path(__file__).with_name('mobile_sync.py'),target/'mobile_sync.py')
     (target/'mobile_sync_config.json').write_text(json.dumps({'base_url':url.rstrip('/'),'pc_token':token},ensure_ascii=False,indent=2),encoding='utf-8')

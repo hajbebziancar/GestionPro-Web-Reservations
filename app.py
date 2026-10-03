@@ -158,7 +158,7 @@ def to_date(s):
 
 def reservation_overlap(c, vehicle_code, start_date, end_date, ignore_reservation_id=None):
     sql = '''SELECT id,code_reservation,date_depart,date_retour,statut FROM reservations
-             WHERE code_vehicule=? AND COALESCE(statut,'EN ATTENTE') NOT IN ('ANNULEE','ANNULÉE')'''
+             WHERE code_vehicule=? AND COALESCE(statut,'EN ATTENTE') NOT IN ('ANNULEE','ANNULÉE','ANNULÉ','ANNULE','TERMINEE','TERMINÉ','TERMINE')'''
     params = [vehicle_code]
     if ignore_reservation_id:
         sql += ' AND id<>?'; params.append(ignore_reservation_id)
@@ -252,11 +252,14 @@ def reserve():
         flash('Numéro de téléphone invalide.', 'error'); return redirect(url_for('home'))
     try:
         d1,d2 = to_date(dep), to_date(ret)
+        start_at=datetime.strptime(d1.isoformat()+' '+hdep,'%Y-%m-%d %H:%M')
+        end_at=datetime.strptime(d2.isoformat()+' '+hret,'%Y-%m-%d %H:%M')
+        if end_at<=start_at:raise ValueError('Heure de retour invalide')
     except ValueError:
         flash('Dates invalides.', 'error'); return redirect(url_for('home'))
     if d1 < date.today() or d2 < d1:
         flash('La période de réservation est invalide.', 'error'); return redirect(url_for('home'))
-    duree = (d2-d1).days + 1
+    duree = max(1, (d2-d1).days)
     with db() as c:
         v = c.execute('''SELECT code_vehicule,marque,immatriculation,prix_jour FROM vehicules
                          WHERE code_vehicule=? AND UPPER(COALESCE(service,''))='EN SERVICE' ''',(vehicle,)).fetchone()

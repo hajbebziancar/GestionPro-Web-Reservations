@@ -1,3 +1,6 @@
+MISE À JOUR 03/10/2026 : lire COMMENCER_ICI.txt à la racine pour cette version.
+Le site et le mobile sont déployés ensemble avec le Dockerfile de la racine.
+
 GESTION PRO ANDROID AUTONOME – version 1.0
 
 CE QUI EST LIVRÉ

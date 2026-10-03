@@ -5,6 +5,8 @@ from contextlib import contextmanager
 from wsgiref.simple_server import make_server, WSGIServer
 from socketserver import ThreadingMixIn
 ROOT=Path(__file__).resolve().parent
+import sys
+sys.path.insert(0,str(ROOT.parent))
 class Relay:
     def __init__(self, database=None, mobile_token=None, pc_token=None):
         self.path=Path(database or os.environ.get('GP_RELAY_DB',ROOT/'data'/'mobile.sqlite3'))
@@ -47,11 +49,16 @@ class Relay:
                 key='maintenance';identity='reference';record=op['record']
             else:continue
             snapshot[key]=[r for r in snapshot[key] if r[identity]!=record[identity]]+[record]
+        from gestionpro_android.web_bookings import bookings
+        web=bookings()
+        existing={r['reference'] for r in snapshot['reservations']}
+        snapshot['reservations'] += [r for r in web if r['reference'] not in existing]
         snapshot['operations']=ops
         return snapshot
     def validate(self,op):
         if not isinstance(op,dict) or op.get('kind') not in ('client_create','client_update','contract_create','reservation_create','reservation_update','maintenance_create','maintenance_update','vehicle_update'):raise ValueError('Opération inconnue.')
         if not isinstance(op.get('id'),str) or not 8<=len(op['id'])<=80:raise ValueError('Identifiant invalide.')
+        if op.get('trusted_web'):raise ValueError('Réservation web importée uniquement par le serveur.')
         r=op.get('record')
         if not isinstance(r,dict):raise ValueError('Fiche invalide.')
         if op['kind'].startswith('client'):
@@ -65,7 +72,7 @@ class Relay:
         else:
             if not all(r.get(k) for k in ('numero','client_code','vehicle_code','date_depart','date_retour')):raise ValueError('Contrat incomplet.')
             if not isinstance(op.get('frozen'),dict):raise ValueError('Copie figée absente.')
-        if len(json.dumps(op))>3_000_000:raise ValueError('Document trop volumineux.')
+        if len(json.dumps(op))>6_000_000:raise ValueError('Document trop volumineux.')
         if op.get('signature'):
             signature=op['signature']
             if not isinstance(signature,str) or not signature.startswith('data:image/png;base64,'):raise ValueError('Signature invalide.')
@@ -83,6 +90,14 @@ class Relay:
             if length<1 or length>20_000_000:raise ValueError('Taille invalide.')
             role='pc' if path=='/api/pc-exchange' else 'mobile'
             self.auth(e,role);p=json.loads(e['wsgi.input'].read(length))
+            if path=='/api/contract-pdf':
+                from gestionpro_android.contract_document import document_pdf
+                pdf,content=document_pdf(p['frozen'],p.get('signature',''))
+                return 200,{'pdf':base64.b64encode(pdf).decode()}
+            if path=='/api/finance':
+                from gestionpro_android.financial_rules import summary
+                with self.connect() as c:data=json.loads(c.execute('SELECT payload FROM state WHERE id=1').fetchone()[0])
+                return 200,{**summary(data,p.get('start'),p.get('end'),True),'pc_at':data.get('pc_at')}
             with self.connect() as c:
                 c.execute('BEGIN IMMEDIATE')
                 if path=='/api/sync':
@@ -90,6 +105,11 @@ class Relay:
                     if not isinstance(incoming,list) or len(incoming)>50:raise ValueError('Maximum 50 opérations par échange.')
                     for op in incoming:
                         self.validate(op)
+                        if op.get('kind')=='contract_create' and op.get('signature'):
+                            from gestionpro_android.contract_document import document_html
+                            op['document_html']=document_html(op['frozen'],op['signature'])
+                        self.validate(op)
+                        if op['kind']=='contract_create' and op['frozen'].get('record')!=op['record']:raise ValueError('Le document et le contrat ne correspondent pas.')
                         old=c.execute('SELECT payload FROM ops WHERE id=?',(op['id'],)).fetchone()
                         serial=json.dumps(op,sort_keys=True,ensure_ascii=False)
                         if old:
@@ -104,8 +124,24 @@ class Relay:
                         s=p['snapshot']
                         if not all(isinstance(s.get(k),list) for k in ('clients','vehicles','contracts','reservations')):raise ValueError('Données PC invalides.')
                         s['vehicles']=[r for r in s['vehicles'] if r.get('service')==1]
+                        from gestionpro_android.web_bookings import update_statuses,bookings,sync_fleet
+                        previous=json.loads(c.execute('SELECT payload FROM state WHERE id=1').fetchone()[0])
+                        update_statuses(s.get('reservations',[]),previous.get('reservations',[]))
+                        sync_fleet(s)
                         s['pc_at']=time.time();c.execute('UPDATE state SET payload=? WHERE id=1',(json.dumps(s,ensure_ascii=False),))
-                    return 200,{'pending':[json.loads(r[0]) for r in c.execute("SELECT payload FROM ops WHERE status='pending' ORDER BY created,id") ]}
+                    pending=[json.loads(r[0]) for r in c.execute("SELECT payload FROM ops WHERE status='pending' ORDER BY created,id")]
+                    from gestionpro_android.web_bookings import bookings
+                    s=json.loads(c.execute('SELECT payload FROM state WHERE id=1').fetchone()[0]);existing={r['reference']:r for r in s.get('reservations',[])}
+                    for r in bookings():
+                        if r['reference'] not in existing:pending.append({'id':'web-import-'+r['reference'],'kind':'reservation_create','record':r,'trusted_web':True})
+                        elif existing[r['reference']].get('source')=='SITE WEB':
+                            old=existing[r['reference']]
+                            from gestionpro_android.web_bookings import canonical
+                            if canonical(old.get('status'))!=r['status']:
+                                updated={**old,'status':r['status']}
+                                change_id='web-status-'+hashlib.sha256(json.dumps([r['reference'],old,r['status'],s.get('pc_at')],sort_keys=True).encode()).hexdigest()[:40]
+                                pending.append({'id':change_id,'kind':'reservation_update','original':old,'record':updated,'trusted_web':True})
+                    return 200,{'pending':pending}
                 if path=='/api/invite':
                     row=c.execute('SELECT * FROM ops WHERE id=?',(p.get('op_id'),)).fetchone()
                     if not row or row['status']!='pending':raise ValueError('Le contrat doit être en attente de signature avant son transfert au PC.')
@@ -119,17 +155,25 @@ class Relay:
             with self.connect() as c:
                 c.execute('BEGIN IMMEDIATE')
                 invite=c.execute('SELECT * FROM invites WHERE token=?',(token,)).fetchone()
-                if not invite or invite['expires']<time.time() or invite['used']:raise ValueError('Lien expiré ou déjà utilisé.')
+                if not invite or invite['expires']<time.time() :raise ValueError('Lien expiré.')
                 row=c.execute('SELECT * FROM ops WHERE id=?',(invite['op_id'],)).fetchone();op=json.loads(row['payload'])
-                if row['status']!='pending' or op.get('signature'):raise ValueError('Ce contrat ne peut plus être signé.')
-                if method=='GET' and path.endswith('/data'):return 200,{'frozen':op['frozen'],'record':op['record']}
+                if method=='GET' and path.endswith('/data'):
+                    return 200,{'frozen':op['frozen'],'record':op['record'],'signed':bool(op.get('signature')),'pdf':op.get('pdf','')}
+                if method=='POST' and path.endswith('/pdf'):
+                    if invite['used']:return 200,{'pdf':op['pdf']}
+                    from gestionpro_android.contract_document import document_pdf
+                    pdf,content=document_pdf(op['frozen'])
+                    return 200,{'pdf':base64.b64encode(pdf).decode()}
+                if method=='POST' and path.endswith('/save') and (row['status']!='pending' or op.get('signature') or invite['used']):raise ValueError('Ce contrat est déjà signé.')
                 if method=='POST' and path.endswith('/save'):
                     n=int(e.get('CONTENT_LENGTH') or 0)
                     if n<1 or n>3_000_000:raise ValueError('Taille invalide.')
-                    p=json.loads(e['wsgi.input'].read(n));op['signature']=p.get('signature','');op['pdf']=p.get('pdf','')
+                    p=json.loads(e['wsgi.input'].read(n));op['signature']=p.get('signature','')
+                    from gestionpro_android.contract_document import document_pdf
+                    pdf,content=document_pdf(op['frozen'],op['signature']);op['pdf']=base64.b64encode(pdf).decode();op['document_html']=content
                     if not op['signature'] or not op['pdf']:raise ValueError('Signature et PDF obligatoires.')
                     self.validate(op);c.execute('UPDATE ops SET payload=? WHERE id=?',(json.dumps(op,ensure_ascii=False),op['id']))
-                    c.execute('UPDATE invites SET used=1 WHERE token=?',(token,));return 200,{'ok':True}
+                    c.execute('UPDATE invites SET used=1 WHERE token=?',(token,));return 200,{'ok':True,'pdf':op['pdf']}
                 path='/sign.html'
         if method!='GET':raise FileNotFoundError()
         if path in ('/',''):path='/index.html'

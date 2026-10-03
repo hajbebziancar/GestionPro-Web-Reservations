@@ -1,5 +1,5 @@
-const CACHE='gestionpro-mobile-v1.0.0';
-const ASSETS=['/mobile/','/mobile/index.html','/mobile/style.css','/mobile/core.js','/mobile/documents.js','/mobile/app.js','/mobile/vendor/pdf-lib.min.js','/mobile/manifest.json','/mobile/icon-192.png','/mobile/icon-512.png'];
+const CACHE='gestionpro-mobile-v2.0.0';
+const ASSETS=['/mobile/','/mobile/index.html','/mobile/style.css','/mobile/core.js','/mobile/documents.js','/mobile/app.js','/mobile/vendor/pdf-lib.min.js','/mobile/manifest.json','/mobile/icon-192.png','/mobile/icon-512.png','/static/company-logo.png'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS))));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('gestionpro-mobile-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',event=>{const url=new URL(event.request.url);if(url.origin!==self.location.origin||event.request.method!=='GET'||url.pathname.includes('/api/')||url.pathname.includes('/signature/'))return;if(event.request.mode==='navigate'){event.respondWith(fetch(event.request).catch(()=>caches.match('/mobile/index.html')));return}event.respondWith(caches.match(event.request).then(cached=>cached||fetch(event.request)))});

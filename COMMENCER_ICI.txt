@@ -1,0 +1,112 @@
+GESTION PRO — MISE À JOUR SITE + ANDROID — 03 OCTOBRE 2026
+
+Cette archive contient le site complet à déposer dans votre dépôt GitHub
+hajbebziancar/GestionPro-Web-Reservations. Railway reste sur le service existant.
+
+1. PRÉPARER
+Décompressez le ZIP. Ouvrez le dossier GestionPro-Web-Reservations-main.
+Fermez Gestion Pro sur le PC avant la mise à jour de la synchronisation.
+Conservez votre application PC et ses sauvegardes.
+
+2. GITHUB
+Ouvrez votre dépôt existant, branche main.
+Add file > Upload files.
+Glissez le CONTENU du dossier décompressé (app.py, Dockerfile, static,
+templates, gestionpro_android, etc.), avec les sous-dossiers.
+Ne glissez pas le ZIP ni le dossier parent contenant tous ces fichiers.
+Commit changes : « Mise à jour site, contrats, planning et finances ».
+Les fichiers du PC, sa base et les clés privées ne sont pas dans ce ZIP.
+
+3. RAILWAY
+Ouvrez GestionPro-Web-Reservations > Deployments.
+Attendez « Deployment successful » pour le nouveau commit.
+Si le déploiement n'est pas automatique, déclenchez le déploiement du dernier commit.
+Le Dockerfile à utiliser est celui À LA RACINE du dépôt.
+Gardez votre volume existant monté sur /data et les variables déjà configurées.
+Gardez les mêmes chemins GESTIONPRO_WEB_DB et GP_RELAY_DB pour retrouver les données.
+Les deux clés GP_MOBILE_TOKEN et GP_PC_TOKEN doivent rester différentes.
+Ne créez pas un autre service ou un autre volume pour cette mise à jour.
+
+4. METTRE À JOUR LA SYNCHRONISATION DU PC
+Dans le dossier décompressé, ouvrez gestionpro_android.
+Double-cliquez INSTALLER_PC.bat.
+Choisissez le dossier de votre Gestion Pro habituel : main.py + gestionpro_hbz.db.
+Adresse du relais :
+https://gestionpro-web-reservations-production.up.railway.app/mobile/
+Renseignez votre clé GP_PC_TOKEN existante.
+L'installation conserve main.py et la base et sauvegarde les fichiers qu'elle remplace.
+Relancez Gestion Pro avec le lanceur habituel et laissez-le ouvert.
+Une synchronisation se fait environ toutes les 60 secondes.
+Les mises à jour reçues sont visibles après actualisation de la page concernée du PC.
+
+5. TÉLÉPHONE
+Ouvrez dans Chrome :
+https://gestionpro-web-reservations-production.up.railway.app/mobile/
+Fermez l'ancienne fenêtre de l'application puis rouvrez-la pour charger la nouvelle version.
+Dans Paramètres, gardez votre GP_MOBILE_TOKEN.
+Appuyez sur Synchroniser. Vérifiez la date « Dernières données du PC ».
+Au premier usage, connectez-vous et chargez les données avant de travailler hors connexion.
+
+CE QUI CHANGE
+- Site public : présentation existante, annonces société, logo à la place du compteur.
+  Uniquement les véhicules en service ; pas de matricule ni de kilométrage publics.
+- Clients et contrats : vues existantes conservées.
+- Nouveau contrat : recherche exacte par CIN ou code client, puis sélection de la fiche.
+- Planning du parc : mois précédent/suivant, filtre véhicule, contrats et réservations
+  distingués par couleur. Touchez une entrée pour la consulter.
+- Contrat : modèle 1 HBZ de votre version PC fournie ; conditions originales recto/verso.
+  Aperçu PDF avant signature. Signature locale ou lien de signature valable 48 heures.
+  WhatsApp utilise le téléphone enregistré ; sans téléphone vous pouvez copier le lien.
+  Le client peut télécharger sa copie signée et la retélécharger durant la validité du lien.
+  Le PDF et la signature sont récupérés et archivés sur le PC.
+- Réservations publiques : remontée vers le PC et le téléphone ; confirmation/annulation
+  dans la fiche ; bouton « Établir un contrat ». Après signature et import PC,
+  la réservation d'origine est marquée terminée.
+- Tarification du site harmonisée sur les jours de Gestion Pro : différence entre les dates,
+  avec un minimum d'un jour. Les heures de retour doivent suivre celles de départ.
+- Finances : mois, année, toutes dates ou période personnalisée ; chiffre d'affaires,
+  créances, banque/caisse de la synthèse PC, charges, résultat, et lignes détaillées.
+  Les jours de production, règlements et transferts suivent les règles du PC fourni.
+  Les opérations mobiles non encore confirmées par le PC restent hors comptabilité.
+
+VÉRIFIER APRÈS INSTALLATION
+A. Sur le site : logo et annonces visibles ; aucune plaque ou compteur dans les cartes.
+B. Sur le mobile : clients et véhicules de votre PC présents après synchronisation.
+C. Nouveau contrat : saisissez une CIN existante > Rechercher le client.
+D. Consultez le PDF : un recto et un verso complets.
+E. Créez un contrat à signer à distance > Envoyer > Copier le lien / WhatsApp.
+F. Sur le lien client : consulter, accepter recto/verso, signer, télécharger la copie.
+G. Relancez/actualisez Gestion Pro sur le PC : retrouvez le contrat et sa signature.
+H. Faites une réservation de test depuis le site puis confirmez-la depuis le mobile.
+I. Choisissez le même mois dans Finances PC et mobile après synchronisation.
+   Actualisez le centre financier PC pour transmettre ses écritures générées les plus récentes.
+
+FONCTIONNEMENT HORS CONNEXION
+La consultation et les saisies restent locales sur le téléphone.
+La génération du PDF HBZ exact et l'envoi des liens nécessitent Internet.
+Vous pouvez enregistrer un nouveau contrat en mode signature à distance hors connexion,
+puis l'envoyer une fois reconnecté. La signature sur un téléphone hors connexion
+n'est pas finalisée sans génération de son PDF.
+Les périodes financières déjà consultées sont conservées hors connexion ; une nouvelle
+période nécessite une connexion. La date de la synthèse conservée est affichée.
+Le PC peut être éteint : les opérations envoyées attendent sa prochaine ouverture.
+Les disponibilités restent provisoires jusqu'au contrôle de l'agenda par le PC.
+Les anciens PDF présents seulement sur le PC ne sont pas transférés en masse au téléphone.
+
+EN CAS DE PROBLÈME
+- Vérifiez que Railway a bien déployé le dernier commit.
+- Vérifiez GP_PC_TOKEN dans l'installation PC et GP_MOBILE_TOKEN dans le téléphone.
+- Ouvrez mobile_sync_status.json dans le dossier PC pour voir une erreur de synchronisation.
+- Une erreur de disponibilité nécessite de reprendre la saisie avec les données actualisées.
+- Un PDF en cours de conversion bloque une seconde conversion : attendez puis réessayez.
+- Ne supprimez pas le volume Railway ni les bases pour résoudre un problème d'affichage.
+
+VALIDATION EFFECTUÉE
+Tests Python de synchronisation, idempotence, rôles, conflits, signatures,
+réservations publiques, tarifs, finances et ressources SQLite.
+Tests JavaScript de dates, paiements et conflits ; ouverture de l'interface,
+recherche CIN, planning et finances contrôlés dans un navigateur.
+PDF généré avec Chromium : deux pages, texte intégral du verso conservé,
+signature au recto et au verso, contrôle visuel effectué.
+Le déploiement réel dans votre compte Railway et les données réelles du PC
+seront vérifiés après votre installation.
