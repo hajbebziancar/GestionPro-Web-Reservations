@@ -225,10 +225,10 @@ def vehicle_link_count(c, code):
 @app.route('/')
 def home():
     with db() as c:
-        vehicles = c.execute('''SELECT code_vehicule, marque, immatriculation, prix_jour, service, compteur
+        vehicles = c.execute('''SELECT code_vehicule, marque, prix_jour
                                 FROM vehicules
                                 WHERE UPPER(COALESCE(service,''))='EN SERVICE'
-                                ORDER BY marque, immatriculation''').fetchall()
+                                ORDER BY marque, code_vehicule''').fetchall()
         media = media_map(c)
     return render_template('home.html', vehicles=vehicles, media=media)
 
@@ -574,6 +574,11 @@ def persistent_vehicle_photo(filename):
 
 from remote_signatures import bp as signature_blueprint
 app.register_blueprint(signature_blueprint)
+
+# Le site public et le relais Android partagent le même serveur Railway.
+from werkzeug.middleware.dispatcher import DispatcherMiddleware
+from mobile_mount import MobileMount
+app.wsgi_app = DispatcherMiddleware(app.wsgi_app, {'/mobile': MobileMount()})
 
 if __name__ == '__main__':
     print('\nGestionPro Web - HBZ Rent Car')

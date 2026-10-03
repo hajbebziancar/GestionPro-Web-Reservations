@@ -17,7 +17,7 @@
     <nav class="admin-nav">
       <a href="{{ url_for('admin_dashboard') }}" class="{% if request.endpoint=='admin_dashboard' %}active{% endif %}">Réservations</a>
       <a href="{{ url_for('admin_fleet') }}" class="{% if request.endpoint in ['admin_fleet','admin_fleet_add','admin_fleet_edit'] %}active{% endif %}">Parc</a>
-      <a href="{{ url_for('home') }}">Site public</a>
+      <a href="{{ url_for('home') }}">Site public</a><a href="/mobile/">Application Android</a>
     </nav>
     <div class="admin-user"><span class="user-dot"></span>{{ session.get('web_user') }}
       <form method="post" action="{{ url_for('admin_logout') }}"><input type="hidden" name="_csrf" value="{{ csrf_token() }}"><button class="linkbtn">Déconnexion</button></form>
@@ -29,6 +29,6 @@
 </header>
 {% with msgs=get_flashed_messages(with_categories=true) %}{% if msgs %}<div class="flash-wrap">{% for cat,msg in msgs %}<div class="flash {{cat}}">{{msg}}</div>{% endfor %}</div>{% endif %}{% endwith %}
 <main>{% block content %}{% endblock %}</main>
-<footer><b>HBZ Rent Car</b><span>GestionPro Web • {{ current_year }}</span></footer>
+<footer><b>HBZ Rent Car</b><a href="/mobile/">Gestion Pro Android · accès privé</a><span>GestionPro Web • {{ current_year }}</span></footer>
 </body>
 </html>

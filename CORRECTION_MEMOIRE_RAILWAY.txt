@@ -1,0 +1,33 @@
+CORRECTION MEMOIRE — 3 octobre 2026
+
+Fichiers modifies : app.py et remote_signatures.py.
+- Les connexions SQLite principales sont fermees apres chaque operation,
+  avec conservation du commit et du rollback.
+- Une seule conversion Chromium est autorisee a la fois pour toutes les routes
+  PDF. Une autre demande recoit une erreur 503 explicite et peut etre reessayee
+  quelques secondes plus tard. Le verrou est libere meme apres une erreur.
+- La consultation du statut ne charge plus les HTML et PDF complets.
+  Les autres routes ne lisent que les colonnes dont elles ont besoin.
+- Les contrats, signatures et donnees existants sont conserves : aucun changement
+  de schema, aucun effacement de donnees.
+
+INSTALLATION
+1. Extraire le ZIP sur le PC.
+2. Ouvrir le depot GitHub GestionPro-Web-Reservations, branche main.
+3. Add file > Upload files : deposer app.py et remote_signatures.py extraits,
+   directement a la racine du depot (pas le ZIP ni un dossier englobant).
+4. Commit changes. Railway est configure pour deployer automatiquement main.
+5. Attendre Deployment successful puis verifier /health.
+6. Tester plusieurs contrats successifs et le telechargement avant et apres
+   signature. Observer Metrics > Memory, y compris les pics pendant les PDF.
+7. Si un depassement persiste, relever les logs et les pics : une analyse du
+   rendu Chromium reel et des images des contrats est encore necessaire.
+
+VALIDATION LOCALE
+Commande : python -m unittest discover -s tests -v
+3 tests reussis : fermeture/commit/rollback SQLite ; exclusion des conversions
+concurrentes et liberation apres erreur ; parcours de signature et 50 lectures
+successives de statut. La generation Chromium est simulee dans ces tests.
+Chromium n'etait pas installe dans l'environnement de verification.
+Cette correction traite des consommations identifiees dans le code ; elle ne
+prouve pas que tous les contrats resteront sous 1 Go en production.

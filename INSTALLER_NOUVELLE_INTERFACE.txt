@@ -1,0 +1,14 @@
+INTERFACE GESTIONPRO D’ORIGINE CONSERVÉE
+
+Remplacer uniquement :
+app.py
+templates/home.html
+static/style.css
+
+Publicités ajoutées dans le thème existant.
+Site public : aucun matricule ni kilométrage ni code affiché ; véhicules EN SERVICE uniquement.
+Photos et tarifs existants conservés. Les encarts se modifient dans templates/home.html.
+Les données et la signature à distance restent conservées.
+Si la précédente interface a été installée, remplacer aussi templates/base.html fourni ici pour rétablir l’en-tête d’origine.
+Attendre le déploiement automatique après le commit GitHub.
+Ne pas modifier le volume /data ni charger de base de données.

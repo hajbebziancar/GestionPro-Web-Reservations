@@ -1,0 +1,9 @@
+const assert=require('node:assert/strict');const GP=require('../mobile/core.js');
+assert.deepEqual(GP.quote('2026-10-02','2026-10-05','300','200'),{days:3,total:900,paid:200,balance:700});
+assert.throws(()=>GP.quote('2026-10-05','2026-10-02',300,0));assert.throws(()=>GP.quote('2026-10-02','2026-10-05',300,901));assert.throws(()=>GP.parseDate('2026-02-30'));
+assert.equal(GP.num('1 500,25'),1500.25);
+const data={contracts:[{numero:'C1',vehicle_code:'V1',date_depart:'02/10/2026',heure_depart:'09:00',date_retour:'05/10/2026',heure_retour:'09:00',montant:900,reglement:200,reste:700},{numero:'C2',vehicle_code:'V2',date_depart:'01/10/2026',date_retour:'02/10/2026',montant:100,reglement:100,reste:0,return_status:'RETOUR CONFIRMÉ'}],reservations:[{reference:'R1',vehicle:'V1 | 208',start_date:'10/10/2026',end_date:'12/10/2026',status:'CONFIRMÉ',total:600,deposit:100}],expenses:[{reference:'E1',type:'CHARGE',date:'03/10/2026',amount:100,status:'PAYÉ'},{reference:'E2',type:'CHARGE',date:'03/10/2026',amount:50,status:'EN ATTENTE'},{reference:'E3',type:'CHARGE',date:'03/10/2026',amount:150,status:'PAYÉ',source_maintenance:'M1'}],maintenance:[{reference:'M1',date:'03/10/2026',amount:150},{reference:'M2',date:'03/10/2026',amount:30}],checks:[]};
+assert.throws(()=>GP.availability(data,'V1','2026-10-03','2026-10-04'));
+GP.availability(data,'V1','2026-10-05','2026-10-06');assert.throws(()=>GP.availability(data,'V1','2026-10-10','2026-10-11'));
+const f=GP.finance(data,'2026-10');assert.equal(f.revenue,1000);assert.equal(f.paid,300);assert.equal(f.remaining,700);assert.equal(f.advances,100);assert.equal(f.expenses,250);assert.equal(f.maintenance,30);assert.equal(f.unpaidExpenses,50);assert.equal(f.operatingEstimate,720);
+assert.equal(GP.finance(data,'2026-09').revenue,0);console.log('Tests domaine mobile : OK (dates, conflits, paiements et synthèse financière).');

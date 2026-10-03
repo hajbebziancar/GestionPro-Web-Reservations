@@ -1,0 +1,29 @@
+VÉRIFICATIONS DE LA LIVRAISON
+
+PASSÉES
+• 7 tests d’intégration Python sur des bases fictives distinctes des données réelles.
+• Création client + contrat quand le PC est éteint, puis récupération PC.
+• Nouvel échange après interruption/rejeu : aucun double client ni double contrat.
+• Compteur PC modifié entre deux échanges : mise à jour Android rejetée, compteur conservé.
+• Chevauchement de contrats : deuxième contrat rejeté.
+• Création réservation et entretien, modification de l’entretien et recalcul des alertes véhicule PC.
+• Contrat non signé conservé en attente ; signature distante reçue, puis contrat récupéré ; deuxième utilisation du lien refusée.
+• Clés Android et PC séparées : accès du mauvais rôle refusé.
+• CIN en double et contrat dont la copie figée ne correspond plus à la saisie : rejets sans enregistrements partiels.
+• Tests JavaScript des dates, durée, prix, règlement, solde, disponibilités et calcul financier avec entretien lié à une charge.
+• Python compileall et vérification syntaxique JavaScript.
+• Installation additive testée sur une copie de app.py du site fourni ; patch de démarrage PC vérifié syntaxiquement.
+• Serveur HTTP : interface et les 10 ressources locales nécessaires au cache répondent correctement ; échange authentifié vérifié.
+
+LIMITES D’ESSAI
+• Le navigateur de test ne peut pas accéder au serveur local dans cet environnement. Pas de validation visuelle exécutée dans ce navigateur.
+• Pas d’essai sur un téléphone Android physique, ni d’installation Chrome exécutée.
+• La production de PDF raster via canvas et le partage Android/WhatsApp restent à vérifier sur le téléphone. La bibliothèque PDF est incluse localement pour le fonctionnement hors connexion.
+• Pas de déploiement Railway/GitHub, ni de liaison aux données réelles dans cette session.
+• Le site existant doit disposer des deux clés et d’un volume persistant ; l’adaptateur PC doit être installé puis configuré.
+
+COMMANDES POUR REJOUER LES TESTS
+python tests/test_sync.py
+node tests/test_core.js
+
+Les bases, CIN, numéros et documents employés par les tests sont fictifs. Le paquet ne contient pas votre base de données réelle, vos mots de passe ou vos signatures existantes.

@@ -1,0 +1,22 @@
+SITE WEB + GESTION PRO ANDROID — UN SEUL DÉPLOIEMENT RAILWAY
+
+1. Décompresser ce ZIP. Charger le CONTENU du dossier GestionPro-Web-Reservations-main à la racine du dépôt GitHub existant : app.py, mobile_mount.py, gestionpro_android/, templates/, static/, Dockerfile, etc. Ne pas charger le ZIP seul, ni ajouter un dossier parent autour du projet.
+2. Conserver le Dockerfile principal et production_server.py. Le Dockerfile dans gestionpro_android est uniquement celui du paquet autonome : ne pas le choisir dans Railway.
+3. Dans Railway, Variables, ajouter :
+GP_MOBILE_TOKEN : clé privée Android longue et aléatoire
+GP_PC_TOKEN : autre clé privée longue et aléatoire, différente
+GP_RELAY_DB : /data/gestionpro_mobile.sqlite3
+Conserver le volume /data existant et les variables actuelles du site.
+Produire deux clés avec un gestionnaire de mots de passe (32 caractères ou davantage). Ne pas les mettre dans GitHub ni les envoyer aux clients.
+4. Attendre le déploiement automatique après le commit.
+Site : https://gestionpro-web-reservations-production.up.railway.app/
+Android : https://gestionpro-web-reservations-production.up.railway.app/mobile/
+Signatures du site existant : routes conservées.
+Sans clés mobiles, le site continue de fonctionner ; /mobile/ affiche un message de configuration.
+5. Pour connecter vos données PC : exécuter gestionpro_android/INSTALLER_PC.bat sur Windows, sélectionner le dossier Gestion Pro contenant main.py et sa base, renseigner l’adresse terminée par /mobile/ et la clé GP_PC_TOKEN. Voir gestionpro_android/LIRE_MOI.txt pour les limites des versions EXE.
+6. Sur Android : ouvrir /mobile/ dans Chrome, paramètres, saisir GP_MOBILE_TOKEN, synchroniser puis menu Chrome > Installer l’application.
+
+L’interface publique d’origine est conservée avec publicités, véhicules EN SERVICE et sans immatriculation ni kilométrage affichés. L’application Android privée conserve les données nécessaires aux contrats et entretiens.
+Le relais mobile utilise une base séparée et persistante ; il ne remplace pas la base du site. Les données Android arrivent depuis le PC via son adaptateur, pas automatiquement depuis les tables du site.
+Le téléphone peut travailler hors connexion après la première installation. L’échange avec le PC nécessite une connexion et Gestion Pro ouvert sur le PC.
+Un seul service Railway, mais la consommation des deux fonctions reste facturée selon l’abonnement existant.

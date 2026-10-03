@@ -24,11 +24,11 @@
       <div class="vehicle-photo">
         {% if media.get(v.code_vehicule) %}<img src="{{ url_for('static', filename='uploads/vehicules/' + media.get(v.code_vehicule)) }}" alt="{{v.marque}}">
         {% else %}<div class="vehicle-placeholder"><span>HBZ</span><small>RENT CAR</small></div>{% endif %}
-        <span class="availability-badge">Disponible à la réservation</span>
+        <span class="availability-badge">En service</span>
       </div>
       <div class="vehicle-body">
-        <div class="vehicle-title"><div><h3>{{v.marque or 'Véhicule'}}</h3><span>{{v.immatriculation}}</span></div><div class="price">{% if v.prix_jour %}<b>{{'%.0f'|format(v.prix_jour)}} MAD</b><small>/ jour</small>{% else %}<b>Sur demande</b>{% endif %}</div></div>
-        <div class="vehicle-meta"><span>Code {{v.code_vehicule}}</span>{% if v.compteur %}<span>{{'%.0f'|format(v.compteur)}} km</span>{% endif %}</div>
+        <div class="vehicle-title"><div><h3>{{v.marque or 'Véhicule'}}</h3></div><div class="price">{% if v.prix_jour %}<b>{{'%.0f'|format(v.prix_jour)}} MAD</b><small>/ jour</small>{% else %}<b>Sur demande</b>{% endif %}</div></div>
+
         <a href="#reservation" class="vehicle-select" data-code="{{v.code_vehicule}}">Choisir ce véhicule</a>
       </div>
     </article>
@@ -38,13 +38,22 @@
   </div>
 </section>
 
+<section class="section-block" aria-labelledby="pub-title">
+  <div class="section-heading"><div><span class="eyebrow">HAJ BEN ZIAN CAR</span><h2 id="pub-title">Votre partenaire de location</h2></div></div>
+  <div class="vehicle-grid company-ads">
+    <article class="card company-ad"><span class="eyebrow">LOCATION DE VOITURES</span><h3>Une voiture pour vos déplacements</h3><p>Découvrez notre parc et préparez votre location avec Haj Ben Zian Car.</p><a class="vehicle-select" href="#parc">Découvrir nos véhicules</a></article>
+    <article class="card company-ad"><span class="eyebrow">SÉJOURS & VOYAGES</span><h3>Préparez votre prochain séjour</h3><p>Envoyez vos dates et vos besoins pour organiser votre réservation avec notre équipe.</p><a class="vehicle-select" href="#reservation">Demander une réservation</a></article>
+    <article class="card company-ad"><span class="eyebrow">DÉPLACEMENTS PROFESSIONNELS</span><h3>Accompagner vos projets</h3><p>Indiquez vos besoins de mobilité dans votre demande et échangez avec notre agence.</p><a class="vehicle-select" href="#reservation">Envoyer ma demande</a></article>
+  </div>
+</section>
+
 <section id="reservation" class="reservation-layout">
   <div class="reservation-intro"><span class="eyebrow">RÉSERVATION</span><h2>Envoyez votre demande</h2><p>Indiquez vos coordonnées et votre période. GestionPro vérifie automatiquement les chevauchements avec les locations et réservations existantes.</p><div class="info-box"><b>Après l’envoi</b><span>Votre demande reçoit le statut EN ATTENTE. L’agence peut ensuite la confirmer depuis l’administration.</span></div></div>
   <section class="card reservation-card">
     <form method="post" action="{{ url_for('reserve') }}" class="grid"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
       <label>Nom *<input name="nom" required maxlength="80" autocomplete="family-name"></label><label>Prénom *<input name="prenom" required maxlength="80" autocomplete="given-name"></label>
       <label>Téléphone *<input name="telephone" required maxlength="30" placeholder="06..." autocomplete="tel"></label><label>CIN<input name="cin" maxlength="40"></label>
-      <label class="wide">Véhicule *<select id="vehicleSelect" name="code_vehicule" required><option value="">Choisir un véhicule...</option>{% for v in vehicles %}<option value="{{v.code_vehicule}}">{{v.marque}} — {{v.immatriculation}}{% if v.prix_jour %} — {{'%.0f'|format(v.prix_jour)}} MAD/jour{% endif %}</option>{% endfor %}</select></label>
+      <label class="wide">Véhicule *<select id="vehicleSelect" name="code_vehicule" required><option value="">Choisir un véhicule...</option>{% for v in vehicles %}<option value="{{v.code_vehicule}}">{{v.marque}}{% if v.prix_jour %} — {{'%.0f'|format(v.prix_jour)}} MAD/jour{% endif %}</option>{% endfor %}</select></label>
       <label>Date départ *<input type="date" name="date_depart" required></label><label>Heure départ<select name="heure_depart">{% for h in ['08:00','09:00','10:00','11:00','12:00','14:00','15:00','16:00','17:00','18:00'] %}<option>{{h}}</option>{% endfor %}</select></label>
       <label>Date retour *<input type="date" name="date_retour" required></label><label>Heure retour<select name="heure_retour">{% for h in ['08:00','09:00','10:00','11:00','12:00','14:00','15:00','16:00','17:00','18:00'] %}<option>{{h}}</option>{% endfor %}</select></label>
       <label class="wide">Observation<textarea name="observation" maxlength="500" rows="3" placeholder="Besoin particulier, lieu souhaité, remarque..."></textarea></label>
