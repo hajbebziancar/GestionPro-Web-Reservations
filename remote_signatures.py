@@ -6,7 +6,6 @@ from remote_contract_common import normalize_png,insert_signature,ensure_verso
 bp=Blueprint('remote_signatures',__name__)
 DATA=Path(os.environ.get('HBZ_SIGNATURE_DATA_DIR',str(Path(os.environ.get('GESTIONPRO_DATA_DIR',str(Path(__file__).resolve().parent))) / 'signature_data')))
 _lock=threading.Lock()
-_pdf_slot=threading.BoundedSemaphore(1)
 
 from contextlib import contextmanager
 
@@ -27,23 +26,13 @@ def authorized():
     secret=(os.environ.get('GESTIONPRO_API_TOKEN') or os.environ.get('HBZ_WEB_SYNC_TOKEN','')).strip()
     if not secret or not secrets.compare_digest(request.headers.get('Authorization',''),'Bearer '+secret):abort(401)
 
-def get(token, fields='*'):
-    # fields are fixed internal projections, never supplied by the caller.
-    with db() as c:r=c.execute('SELECT '+fields+' FROM signatures WHERE token=?',(token,)).fetchone()
+def get(token):
+    with db() as c:r=c.execute('SELECT * FROM signatures WHERE token=?',(token,)).fetchone()
     if not r:abort(404)
     if r['expires']<time.time():abort(410,'Ce lien a expiré. Demandez un nouveau lien à l’agence.')
     return r
 
 def render_pdf(content):
-    # All PDF routes share one slot: never run several browsers under 1 GB.
-    if not _pdf_slot.acquire(blocking=False):
-        raise RuntimeError('Une conversion PDF est en cours. Réessayez dans quelques secondes.')
-    try:
-        return _render_pdf(content)
-    finally:
-        _pdf_slot.release()
-
-def _render_pdf(content):
     browser=os.environ.get('HBZ_CHROMIUM_PATH') or shutil.which('chromium') or shutil.which('google-chrome')
     if not browser:raise RuntimeError('La conversion PDF nécessite Chromium sur le serveur.')
     # The PDF renderer has no permission to load network or local resources.
@@ -94,7 +83,7 @@ def create():
 
 @bp.get('/signature/<token>')
 def page(token):
-    r=get(token, 'expires,contract_no,pdf IS NOT NULL AS pdf')
+    r=get(token)
     from signature_page import _page
     page=_page(token,r['contract_no'])
     introduction=f'''<div style="margin:16px 0"><a href="/signature/{token}/contract" target="_blank" rel="noopener">Ouvrir le contrat complet</a><a href="/signature/{token}/original.pdf">Télécharger le contrat avant signature (PDF)</a><iframe id="contract-preview" title="Contrat à lire avant signature" sandbox src="/signature/{token}/contract" style="width:100%;height:65vh;background:white;border:1px solid #c9d9e8"></iframe><label><input type="checkbox" id="accepted"> J’ai lu le recto et le verso de ce contrat et j’accepte de les signer.</label><p><a id="download" href="/signature/{token}/pdf" style="display:{'inline' if r['pdf'] else 'none'}">Télécharger mon contrat signé (PDF)</a></p></div>'''
@@ -110,15 +99,15 @@ def page(token):
 
 @bp.get('/signature/<token>/contract')
 def contract(token):
-    r=get(token, 'expires,signed,original');return Response(r['signed'] or r['original'],mimetype='text/html',headers={'Content-Security-Policy':"default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:; base-uri 'none'"})
+    r=get(token);return Response(r['signed'] or r['original'],mimetype='text/html',headers={'Content-Security-Policy':"default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:; base-uri 'none'"})
 
 @bp.get('/signature/<token>/status')
 def status(token):
-    r=get(token, 'expires,png,pdf IS NOT NULL AS pdf');return jsonify(saved=bool(r['pdf']),revision=hashlib.sha256(r['png']).hexdigest() if r['png'] else '')
+    r=get(token);return jsonify(saved=bool(r['pdf']),revision=hashlib.sha256(r['png']).hexdigest() if r['png'] else '')
 
 @bp.get('/signature/<token>/image')
 def image(token):
-    r=get(token, 'expires,png')
+    r=get(token)
     if not r['png']:abort(404)
     return Response(r['png'],mimetype='image/png')
 
@@ -129,7 +118,7 @@ def save(token):
     if body.get('accepted') is not True:return jsonify(ok=False,error='Confirmez la lecture du contrat.'),400
     try:
         with _lock:
-            r=get(token, 'expires,original,pdf IS NOT NULL AS pdf')
+            r=get(token)
             if r['pdf']:return jsonify(ok=True)
             uri=body.get('image','')
             if not isinstance(uri,str) or not uri.startswith('data:image/png;base64,'):raise ValueError('Image PNG requise.')
@@ -146,7 +135,7 @@ def save(token):
 
 @bp.get('/signature/<token>/original.pdf')
 def original_download(token):
-    r=get(token, 'expires,original')
+    r=get(token)
     try:payload=render_pdf(r['original'])
     except RuntimeError as exc:return jsonify(error=str(exc)),503
     import io
@@ -154,7 +143,7 @@ def original_download(token):
 
 @bp.get('/signature/<token>/pdf')
 def download(token):
-    r=get(token, 'expires,contract_no,pdf')
+    r=get(token)
     if not r['pdf']:abort(409,'Le contrat n’est pas encore signé.')
     import io
     safe=''.join(c for c in r['contract_no'] if c.isalnum() or c in '-_')

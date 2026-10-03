@@ -35,19 +35,12 @@ STATUS_ALLOWED = {'EN ATTENTE','CONFIRMEE','ANNULEE'}
 VEHICLE_STATUS_ALLOWED = {'EN SERVICE','HORS SERVICE'}
 ALLOWED_IMAGE_EXTENSIONS = {'png','jpg','jpeg','webp'}
 
-from contextlib import contextmanager
-
-@contextmanager
 def db():
     c = sqlite3.connect(DB_PATH, timeout=15)
     c.row_factory = sqlite3.Row
     c.execute('PRAGMA foreign_keys=ON')
     c.execute('PRAGMA busy_timeout=15000')
-    try:
-        with c:
-            yield c
-    finally:
-        c.close()
+    return c
 
 def init_web_schema():
     with db() as c:
