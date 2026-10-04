@@ -1,4 +1,4 @@
-const CACHE='gestionpro-mobile-v2.3.0';
+const CACHE='gestionpro-mobile-v2.3.1';
 const ASSETS=['/mobile/','/mobile/index.html','/mobile/style.css','/mobile/core.js','/mobile/documents.js','/mobile/app.js','/mobile/vendor/pdf-lib.min.js','/mobile/manifest.json','/mobile/icon-192.png','/mobile/icon-512.png','/static/company-logo.png','/mobile/brands/citroen.svg','/mobile/brands/dacia.png','/mobile/brands/opel.svg','/mobile/brands/peugeot.png','/mobile/brands/renault.svg','/mobile/brands/volkswagen.svg'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS))));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('gestionpro-mobile-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
