@@ -138,15 +138,9 @@ class Relay:
                         old=c.execute('SELECT payload FROM ops WHERE id=?',(op['id'],)).fetchone()
                         serial=json.dumps(op,sort_keys=True,ensure_ascii=False)
                         if old:
-                            server_op=json.loads(old[0])
-                            # A remote signature legitimately enriches the server copy while the
-                            # phone can still hold the original unsigned operation. Preserve the
-                            # signed server copy instead of rejecting the next synchronization.
-                            if server_op!=op:
-                                same_unsigned=(op.get('kind')=='contract_create' and
-                                    not op.get('signature') and bool(server_op.get('signature')) and
-                                    all(op.get(k)==server_op.get(k) for k in ('id','kind','record','frozen')))
-                                if not same_unsigned:raise ValueError('Identifiant réutilisé avec un contenu différent.')
+                            saved=json.loads(old[0])
+                            late_unsigned=saved.get('kind')=='contract_create' and saved.get('signature') and not op.get('signature') and saved.get('record')==op.get('record') and saved.get('frozen')==op.get('frozen')
+                            if saved!=op and not late_unsigned:raise ValueError('Identifiant réutilisé avec un contenu différent.')
                         else:c.execute('INSERT INTO ops(id,payload,created) VALUES(?,?,?)',(op['id'],serial,time.time()))
                     return 200,self.view(c)
                 if path=='/api/pc-exchange':
@@ -181,6 +175,20 @@ class Relay:
                                 change_id='web-status-'+hashlib.sha256(json.dumps([r['reference'],old,r['status'],s.get('pc_at')],sort_keys=True).encode()).hexdigest()[:40]
                                 pending.append({'id':change_id,'kind':'reservation_update','original':old,'record':updated,'trusted_web':True})
                     return 200,{'pending':pending,'document_requests':[r[0] for r in c.execute("SELECT numero FROM document_requests WHERE status='pending' ORDER BY rowid LIMIT 1")]}
+                if path=='/api/sign-contract':
+                    row=c.execute('SELECT * FROM ops WHERE id=?',(p.get('op_id'),)).fetchone()
+                    if not row or row['status']=='rejected':raise ValueError('Contrat absent ou rejeté : consultez la synchronisation.')
+                    op=json.loads(row['payload'])
+                    if op['kind']!='contract_create':raise ValueError('Contrat invalide.')
+                    if op.get('signature'):return 200,{'document':op}
+                    if p.get('accepted') is not True:raise ValueError('Acceptation du recto et du verso requise.')
+                    op['signature']=p.get('signature','');self.validate(op)
+                    if not op['signature']:raise ValueError('Tracez une signature avant de valider.')
+                    from gestionpro_android.contract_document import document_pdf
+                    pdf,content=document_pdf(op['frozen'],op['signature']);op['pdf']=base64.b64encode(pdf).decode();op['document_html']=content
+                    self.validate(op)
+                    c.execute('UPDATE ops SET payload=? WHERE id=?',(json.dumps(op,ensure_ascii=False),op['id']))
+                    return 200,{'document':op}
                 if path=='/api/share-contract':
                     row=next((r for r in c.execute('SELECT * FROM ops ORDER BY created DESC,id DESC') if json.loads(r['payload']).get('record',{}).get('numero')==p.get('numero') and json.loads(r['payload']).get('signature')),None)
                     if not row:raise ValueError('Synchronisez le contrat signé avant de le partager.')
@@ -212,7 +220,9 @@ class Relay:
                 if method=='POST' and path.endswith('/save'):
                     n=int(e.get('CONTENT_LENGTH') or 0)
                     if n<1 or n>3_000_000:raise ValueError('Taille invalide.')
-                    p=json.loads(e['wsgi.input'].read(n));op['signature']=p.get('signature','')
+                    p=json.loads(e['wsgi.input'].read(n))
+                    if p.get('accepted') is not True:raise ValueError('Confirmez l’acceptation du recto et du verso avant de signer.')
+                    op['signature']=p.get('signature','')
                     from gestionpro_android.contract_document import document_pdf
                     pdf,content=document_pdf(op['frozen'],op['signature']);op['pdf']=base64.b64encode(pdf).decode();op['document_html']=content
                     if not op['signature'] or not op['pdf']:raise ValueError('Signature et PDF obligatoires.')

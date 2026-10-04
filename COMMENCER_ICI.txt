@@ -1,3 +1,56 @@
+SIGNATURE À DISTANCE PAR WHATSAPP
+Contrats > ouvrir un contrat non signé > Envoyer le lien de signature par WhatsApp.
+Le numéro vient de la fiche client ; le message contient son lien sécurisé.
+Si le navigateur bloque l’ouverture, utilisez le bouton WhatsApp dans la fenêtre
+qui affiche le lien. Vous confirmez l’envoi dans WhatsApp.
+Le bouton Copier / consulter le lien de signature reste disponible.
+
+LIEN DU SITE À ENVOYER AU CLIENT
+Clients > ouvrir la fiche du client > Site web de la société.
+- Ouvrir le site web : affiche le site public de réservation.
+- Copier le lien du site : copie le lien dans le presse-papiers.
+- Envoyer le site au client par WhatsApp : ouvre la conversation au numéro
+  de téléphone enregistré dans sa fiche, avec le lien déjà dans le message.
+  Vous appuyez sur Envoyer dans WhatsApp.
+Le code client sert à retrouver sa fiche ; WhatsApp utilise son téléphone.
+En cas de numéro absent / invalide, complétez la fiche avant l’envoi.
+Le lien à copier et à ouvrir est également disponible sur l’Accueil.
+Après la mise à jour Railway, fermez et rouvrez l’application téléphone.
+
+ENREGISTRER ET CONFIRMER LA SIGNATURE — CORRECTION DU 03/10/2026
+
+1. Contrats > + Contrat. Recherchez la CIN ou le code client, puis sélectionnez
+   le véhicule. Remplissez les dates et heures (retour après le départ), tarif
+   journalier, règlement et kilométrage de départ.
+2. « Consulter le PDF avant signature » ouvre un aperçu séparé : utilisez
+   « Revenir au contrat » pour retrouver tous les champs et votre dessin.
+3. « Enregistrer le contrat sans signature » conserve le contrat immédiatement
+   sur ce téléphone et affiche une confirmation. Il apparaît dans Contrats.
+   La sauvegarde du contrat ne dépend plus de la génération du PDF.
+4. Pour signer : tracez la signature, cochez l’acceptation du recto et du verso,
+   puis « Valider la signature et enregistrer ». Vous pouvez également enregistrer
+   d’abord, ouvrir le contrat et choisir « Signer sur ce téléphone ».
+5. Après validation avec Internet : « Signature confirmée — PDF signé disponible ».
+   Choisissez « Consulter après signature », « Télécharger PDF signé » ou « WhatsApp ».
+   Le PDF signé contient le dessin de signature au RECTO et au VERSO.
+6. Sans connexion, le contrat et la signature validée restent conservés localement.
+   La copie PDF signée sera générée lors de la prochaine synchronisation connectée.
+   Tant que cette génération n’est pas confirmée, le contrat reste « Signature attendue ».
+7. Pour une signature distante, enregistrez d’abord le contrat, puis envoyez le lien.
+   Le client accepte les conditions, valide sa signature et obtient sa copie signée.
+
+INSTALLATION
+Remplacez les fichiers du dépôt GitHub EXISTANT par le contenu de ce ZIP, attendez
+le déploiement réussi sur Railway, fermez toutes les fenêtres de l’application
+mobile puis rouvrez-la. Ne supprimez pas ses données ni le volume Railway.
+Si vous n’avez pas encore installé le correctif PC du précédent ZIP, exécutez aussi
+ gestionpro_android/INSTALLER_PC.bat puis relancez Gestion Pro.
+Si ce correctif PC est déjà installé, il n’est pas nécessaire de refaire cette étape.
+
+Les erreurs de formulaire restent désormais visibles sous les champs.
+Les boutons Aperçu et Effacer ne déclenchent plus un enregistrement.
+Le clic sur l’aperçu ne détruit plus la saisie ni le dessin de signature.
+
 CORRECTIF SYNCHRONISATION, CONTRATS ET VÉHICULES — 03/10/2026
 
 IMPORTANT : cette mise à jour s’installe sur RAILWAY ET SUR LE PC.

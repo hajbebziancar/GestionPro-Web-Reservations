@@ -80,7 +80,7 @@ class SyncTests(unittest.TestCase):
         status,view=self.call('/mobile/api/sync',{'operations':[]})
         self.assertTrue(view['operations'][-1]['pc_received'])
         status,j=self.call('/mobile/api/invite',{'op_id':'op-contract-001'});self.assertEqual(status,200)
-        raw=json.dumps({'signature':'data:image/png;base64,'+PNG,'pdf':PDF}).encode();env={'PATH_INFO':'/mobile/signature/'+j['token']+'/save','REQUEST_METHOD':'POST','CONTENT_LENGTH':str(len(raw)),'wsgi.input':io.BytesIO(raw)}
+        raw=json.dumps({'signature':'data:image/png;base64,'+PNG,'pdf':PDF,'accepted':True}).encode();env={'PATH_INFO':'/mobile/signature/'+j['token']+'/save','REQUEST_METHOD':'POST','CONTENT_LENGTH':str(len(raw)),'wsgi.input':io.BytesIO(raw)}
         result=self.relay.route(env);self.assertEqual(result[0],200)
         with self.assertRaises(ValueError):self.relay.route({**env,'wsgi.input':io.BytesIO(raw)})
         self.sync()
@@ -110,5 +110,26 @@ class SyncTests(unittest.TestCase):
         self.assertTrue(data['signed']);self.assertTrue(data['pdf'])
         raw=json.dumps({'signature':'data:image/png;base64,'+PNG}).encode()
         with self.assertRaises(ValueError):self.relay.route({'PATH_INFO':'/mobile/signature/'+link['token']+'/save','REQUEST_METHOD':'POST','CONTENT_LENGTH':str(len(raw)),'wsgi.input':io.BytesIO(raw)})
+
+    def test_confirm_local_signature_pdf_both_pages_and_retry(self):
+        from PIL import Image,ImageDraw
+        from pypdf import PdfReader
+        from remote_contract_common import normalize_png
+        canvas=Image.new('RGBA',(900,300),(0,0,0,0));pen=ImageDraw.Draw(canvas)
+        pen.line([(100,240),(450,40),(320,240),(600,90),(750,180)],fill='#133b67',width=7)
+        png=io.BytesIO();canvas.save(png,'PNG');uri='data:image/png;base64,'+base64.b64encode(png.getvalue()).decode()
+        unsigned=self.contract(False)
+        self.call('/mobile/api/sync',{'operations':[self.customer(),unsigned]});self.sync()
+        self.assertEqual(self.call('/mobile/api/sign-contract',{'op_id':unsigned['id'],'signature':uri,'accepted':False})[0],400)
+        status,result=self.call('/mobile/api/sign-contract',{'op_id':unsigned['id'],'signature':uri,'accepted':True})
+        self.assertEqual(status,200);self.assertEqual(result['document']['signature'],uri)
+        pdf=base64.b64decode(result['document']['pdf']);reader=PdfReader(io.BytesIO(pdf))
+        self.assertEqual(len(reader.pages),2)
+        expected=Image.open(io.BytesIO(normalize_png(png.getvalue()))).size
+        for page in reader.pages:self.assertTrue(any(image.image.size==expected for image in page.images),'Signature dessinée absente de la page')
+        self.assertEqual(self.call('/mobile/api/sync',{'operations':[unsigned]})[0],200)
+        self.sync();self.sync()
+        with db(self.path) as c:self.assertEqual(c.execute('SELECT COUNT(*) FROM contracts').fetchone()[0],1)
+        Path('/workspace/scratch/66ebe2e2e65c/confirmation-signature-test.pdf').write_bytes(pdf)
 
 if __name__=='__main__':unittest.main()
