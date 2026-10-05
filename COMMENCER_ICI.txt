@@ -1,3 +1,10 @@
+INTERFACE ANDROID — 5 OCTOBRE 2026
+Barre bleue, menu latéral, fiches compactes et navigation inspirées de la maquette.
+Connexion : conservez votre clé Android existante. Aucun nouveau compte nécessaire.
+Déposez le contenu du dossier à la racine GitHub, attendez Railway, fermez toutes les pages Android puis rouvrez.
+Ne supprimez ni les données du téléphone ni le volume Railway.
+La synchronisation PC conserve son fonctionnement ; son blocage réel nécessite encore le fichier mobile_sync_status.json du PC.
+
 SIGNATURE À DISTANCE PAR WHATSAPP
 Contrats > ouvrir un contrat non signé > Envoyer le lien de signature par WhatsApp.
 Le numéro vient de la fiche client ; le message contient son lien sécurisé.
