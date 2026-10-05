@@ -36,6 +36,23 @@ class SyncTests(unittest.TestCase):
         with db(self.path) as c:v=clean(dict(c.execute('SELECT * FROM vehicles WHERE code="V1"').fetchone()),VEHICLE_FIELDS)
         r={'numero':'MCT-001','client_code':cl['code'],'vehicle_code':'V1','date_depart':'02/10/2026','heure_depart':'09:00','date_retour':'05/10/2026','heure_retour':'09:00','duree':3,'prix':300,'montant':900,'reglement':200,'reste':700,'km_depart':10000}
         return {'id':'op-contract-001','kind':'contract_create','record':r,'frozen':{'record':dict(r),'client':cl,'vehicle':v,'current_km':10000,'settings':{'general_conditions':'Conditions de test'},'created_at':'2026-10-02T09:00:00Z'},'signature':'data:image/png;base64,'+PNG if signed else '', 'pdf':PDF if signed else ''}
+    def test_client_pdf_upload_retry_and_folder(self):
+        op={'id':'op-document-001','kind':'document_upload','record':{'reference':'PDF-001','client_code':'MCL-001','filename':'identite.pdf'},'pdf':PDF}
+        status,result=self.call('/mobile/api/sync',{'operations':[self.customer(),op]})
+        self.assertEqual(status,200,result)
+        self.sync();self.sync()
+        with db(self.path) as c:
+            rows=c.execute('SELECT * FROM client_documents').fetchall()
+            self.assertEqual(len(rows),1)
+            self.assertEqual(rows[0]['client_code'],'MCL-001')
+            self.assertEqual(rows[0]['document_type'],'AUTRE')
+            path=Path(rows[0]['file_path'])
+            self.assertEqual(path.parent,self.root/'assets'/'client_documents'/'MCL-001')
+            self.assertEqual(path.read_bytes(),base64.b64decode(PDF))
+        status,result=self.call('/mobile/api/sync',{'operations':[op]})
+        self.assertEqual(status,200)
+        self.assertEqual(next(o for o in result['operations'] if o['id']==op['id'])['status'],'applied')
+
     def test_offline_creation_pc_off_retry_no_duplicate(self):
         ops=[self.customer(),self.contract()]
         status,result=self.call('/mobile/api/sync',{'operations':ops});self.assertEqual(status,200)

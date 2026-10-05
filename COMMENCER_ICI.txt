@@ -1,3 +1,10 @@
+MISE À JOUR DU 5 OCTOBRE — TABLEAU DE BORD ET PDF CLIENT
+Cinq cartes cliquables : disponibles aujourd’hui, disponibles demain, réservations actives, véhicules en location, dossiers à confirmer.
+Disponibilité calculée sur la journée à partir des dernières données synchronisées.
+Fiche client : Insérer un document PDF (maximum 2 Mo), consulter et transférer vers assets/client_documents du PC.
+IMPORTANT : après mise à jour GitHub/Railway, exécutez gestionpro_android/INSTALLER_PC dans le dossier extrait et sélectionnez le dossier Gestion Pro du PC pour installer le synchroniseur mis à jour. Conservez les clés existantes. Relancez Gestion Pro puis synchronisez le téléphone.
+Ne supprimez aucune donnée ni aucun volume.
+
 INTERFACE ANDROID — 5 OCTOBRE 2026
 Barre bleue, menu latéral, fiches compactes et navigation inspirées de la maquette.
 Connexion : conservez votre clé Android existante. Aucun nouveau compte nécessaire.

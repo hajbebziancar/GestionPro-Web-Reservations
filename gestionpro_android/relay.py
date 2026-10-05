@@ -60,12 +60,14 @@ class Relay:
         snapshot['operations']=ops
         return snapshot
     def validate(self,op):
-        if not isinstance(op,dict) or op.get('kind') not in ('client_create','client_update','contract_create','reservation_create','reservation_update','maintenance_create','maintenance_update','vehicle_update'):raise ValueError('Opération inconnue.')
+        if not isinstance(op,dict) or op.get('kind') not in ('client_create','client_update','contract_create','reservation_create','reservation_update','maintenance_create','maintenance_update','vehicle_update','document_upload'):raise ValueError('Opération inconnue.')
         if not isinstance(op.get('id'),str) or not 8<=len(op['id'])<=80:raise ValueError('Identifiant invalide.')
         if op.get('trusted_web'):raise ValueError('Réservation web importée uniquement par le serveur.')
         r=op.get('record')
         if not isinstance(r,dict):raise ValueError('Fiche invalide.')
-        if op['kind'].startswith('client'):
+        if op['kind']=='document_upload':
+            if not all(r.get(k) for k in ('client_code','reference','filename')) or not op.get('pdf'):raise ValueError('Document PDF incomplet.')
+        elif op['kind'].startswith('client'):
             if not r.get('code') or not r.get('cin') or not r.get('nom'):raise ValueError('Code, CIN et nom obligatoires.')
             if op['kind']=='client_update' and not isinstance(op.get('original'),dict):raise ValueError('Version d’origine absente.')
         elif op['kind']=='vehicle_update':

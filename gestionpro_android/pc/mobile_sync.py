@@ -115,7 +115,22 @@ def apply_one(c,op,root):
     c.execute('SAVEPOINT mobile_op')
     try:
         r=op['record'];kind=op['kind'];now=datetime.now().isoformat(timespec='seconds')
-        if kind.startswith('client_'):
+        if kind=='document_upload':
+            if not c.execute('SELECT 1 FROM clients WHERE code=?',(r['client_code'],)).fetchone():raise ValueError('Client absent du PC. Synchronisez d’abord sa fiche.')
+            raw=base64.b64decode(op.get('pdf',''),validate=True)
+            if not raw.startswith(b'%PDF-') or len(raw)>2000000:raise ValueError('PDF invalide ou trop volumineux.')
+            import re
+            safe_code=re.sub(r'[^0-9A-Za-z_-]+','_',str(r['client_code']).strip())
+            if not safe_code:raise ValueError('Code client invalide.')
+            folder=root/'assets'/'client_documents'/safe_code;folder.mkdir(parents=True,exist_ok=True)
+            name=re.sub(r'[^0-9A-Za-z_.-]+','_',Path(r['filename']).name)[:100]
+            if not name.lower().endswith('.pdf'):name+='.pdf'
+            destination=folder/('ANDROID_'+hashlib.sha256(op['id'].encode()).hexdigest()[:16]+'_'+name)
+            temp=destination.with_suffix('.tmp');temp.write_bytes(raw);temp.replace(destination)
+            c.execute('CREATE TABLE IF NOT EXISTS client_documents(id INTEGER PRIMARY KEY AUTOINCREMENT,client_code TEXT NOT NULL,document_type TEXT NOT NULL,file_path TEXT NOT NULL,created_at TEXT NOT NULL)')
+            if not c.execute('SELECT 1 FROM client_documents WHERE file_path=?',(str(destination),)).fetchone():c.execute('INSERT INTO client_documents(client_code,document_type,file_path,created_at) VALUES(?,?,?,?)',(r['client_code'],'AUTRE',str(destination),now))
+            message='PDF enregistré dans le dossier documentaire du client sur le PC.'
+        elif kind.startswith('client_'):
             r=clean(r,CLIENT_FIELDS)
             if not r['code'] or not str(r['nom']).strip() or not str(r['cin']).strip():raise ValueError('Nom et CIN obligatoires.')
             duplicate=c.execute('SELECT code FROM clients WHERE UPPER(TRIM(cin))=UPPER(TRIM(?)) AND code<>?',(r['cin'],r['code'])).fetchone()
