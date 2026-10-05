@@ -22,6 +22,27 @@ def db(path):
     return c
 def module(c,name):
     return [{**json.loads(r[1]), '_record_id':r[0]} if name=='contract_payment_mode' else json.loads(r[1]) for r in c.execute('SELECT record_id,payload FROM module_records WHERE module=?',(name,))]
+def picture_path(value):
+    value=str(value or '').strip().strip('"').replace('\\','/')
+    if not value:return None
+    direct=Path(value)
+    candidates=[direct,ROOT/value,ROOT/'assets'/value.rsplit('/',1)[-1]]
+    for path in candidates:
+        if path.is_file():return path
+    # Recover a moved PC folder using the preserved suffix first.
+    parts=value.split('/')
+    for anchor in ('assets','photos','vehicle_photos','photos_vehicules'):
+        if anchor in parts:
+            path=ROOT.joinpath(*parts[parts.index(anchor):])
+            if path.is_file():return path
+    # Never assign an arbitrary photo when several files share a name.
+    matches=[]
+    for folder in (ROOT/'assets',ROOT/'photos',ROOT/'vehicle_photos',ROOT/'photos_vehicules'):
+        if folder.is_dir():
+            matches.extend(p for p in folder.rglob(parts[-1]) if p.is_file())
+    matches=list(dict.fromkeys(matches))
+    return matches[0] if len(matches)==1 else None
+
 def inline_picture(value,max_size=(800,800)):
     value=str(value or '')
     if not value:return ''
@@ -30,16 +51,15 @@ def inline_picture(value,max_size=(800,800)):
         import io
         value=str(value or '')
         if not value:return ''
-        candidates=[ROOT/value,ROOT/'assets'/value.replace('\\','/').rsplit('/',1)[-1],Path(value)]
-        path=next((p for p in candidates if p.is_file()),None)
+        path=picture_path(value)
         if not path:return ''
         with Image.open(path) as im:
             im=im.convert('RGB');im.thumbnail(max_size);out=io.BytesIO();im.save(out,'JPEG',quality=85)
         return 'data:image/jpeg;base64,'+base64.b64encode(out.getvalue()).decode()
     except (OSError,ValueError,ImportError):
         try:
-            path=Path(value) if Path(value).is_absolute() else ROOT/value
-            if path.is_file() and path.suffix.lower() in ('.png','.jpg','.jpeg') and path.stat().st_size<350000:
+            path=picture_path(value)
+            if path and path.is_file() and path.suffix.lower() in ('.png','.jpg','.jpeg') and path.stat().st_size<350000:
                 return 'data:image/'+('png' if path.suffix.lower()=='.png' else 'jpeg')+';base64,'+base64.b64encode(path.read_bytes()).decode()
         except (OSError,ValueError):pass
         return ''

@@ -1,0 +1,9 @@
+PHOTOS VEHICULES PC VERS ANDROID
+
+Fermez Gestion Pro et executez gestionpro_android/INSTALLER_PC.bat.
+Selectionnez le dossier Gestion Pro habituel, conservez adresse et jeton PC.
+Relancez Gestion Pro puis synchronisez Android.
+La photo enregistree sur la fiche vehicule PC est transmise avec son code vehicule.
+Seuls les vehicules en service apparaissent dans la liste Android.
+Les fichiers photo doivent encore exister sur le PC.
+Si plusieurs fichiers ont le meme nom et que le chemin est perdu, reselectionnez la photo dans la fiche vehicule PC.
