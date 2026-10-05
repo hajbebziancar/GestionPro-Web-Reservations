@@ -1,3 +1,6 @@
+ALERTES ENTRETIEN ET DATES
+Vidange <= 1000 km, AdBlue <= 2000 km, chaîne <= 5000 km ; assurance et visite technique < 8 jours, dates dépassées incluses. Rouge et notifications à ouverture/synchronisation, une fois par jour. Activez les notifications dans le tableau de bord. Les notifications ne sont pas planifiées lorsque l’application est fermée.
+
 MISE À JOUR DU 5 OCTOBRE — TABLEAU DE BORD ET PDF CLIENT
 Cinq cartes cliquables : disponibles aujourd’hui, disponibles demain, réservations actives, véhicules en location, dossiers à confirmer.
 Disponibilité calculée sur la journée à partir des dernières données synchronisées.

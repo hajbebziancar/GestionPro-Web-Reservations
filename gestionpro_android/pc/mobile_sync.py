@@ -273,7 +273,7 @@ def start(root=ROOT,app=None):
                 if (root/'mobile_sync_config.json').exists():sync_once(root)
                 if app is not None:
                     def refresh():
-                        for name in ('refresh_clients','refresh_vehicles','refresh_contract_history','refresh_dashboard'):
+                        for name in ('refresh_clients','refresh_vehicles','refresh_contract_history','refresh_dashboard','_client_reference_refresh_documents'):
                             try:getattr(app,name)()
                             except Exception:pass
                     app.root.after(0,refresh)
