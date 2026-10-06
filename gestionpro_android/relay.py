@@ -7,10 +7,12 @@ from socketserver import ThreadingMixIn
 ROOT=Path(__file__).resolve().parent
 import sys
 sys.path.insert(0,str(ROOT.parent))
+from security_limits import AttemptLimiter
 class Relay:
     def __init__(self, database=None, mobile_token=None, pc_token=None):
         self.path=Path(database or os.environ.get('GP_RELAY_DB',ROOT/'data'/'mobile.sqlite3'))
         self.path.parent.mkdir(parents=True,exist_ok=True)
+        self.limiter=AttemptLimiter(self.path.parent/'relay_security_limits.sqlite3')
         self.mobile=mobile_token or os.environ.get('GP_MOBILE_TOKEN','')
         self.pc=pc_token or os.environ.get('GP_PC_TOKEN','')
         if not self.mobile or not self.pc or self.mobile==self.pc:
@@ -30,8 +32,11 @@ class Relay:
         finally:
             c.close()
     def auth(self,e,role):
+        if self.limiter.blocked('auth:'+e.get('REMOTE_ADDR','unknown')):raise PermissionError('Trop de tentatives. Réessayez dans 15 minutes.')
         token=e.get('HTTP_AUTHORIZATION','').removeprefix('Bearer ')
-        if not hmac.compare_digest(token,self.mobile if role=='mobile' else self.pc):raise PermissionError('Accès refusé. Vérifiez votre clé de connexion.')
+        if not hmac.compare_digest(token,self.mobile if role=='mobile' else self.pc):
+            if not self.limiter.attempt('auth:'+e.get('REMOTE_ADDR','unknown')):raise PermissionError('Trop de tentatives. Réessayez dans 15 minutes.')
+            raise PermissionError('Accès refusé. Vérifiez votre clé de connexion.')
     def view(self,c):
         snapshot=json.loads(c.execute('SELECT payload FROM state WHERE id=1').fetchone()[0])
         ops=[{**json.loads(r['payload']),'status':r['status'],'message':r['message']} for r in c.execute('SELECT * FROM ops ORDER BY created,id')]
@@ -191,6 +196,11 @@ class Relay:
                     self.validate(op)
                     c.execute('UPDATE ops SET payload=? WHERE id=?',(json.dumps(op,ensure_ascii=False),op['id']))
                     return 200,{'document':op}
+                if path=='/api/revoke-contract-links':
+                    rows=[r['id'] for r in c.execute('SELECT * FROM ops') if json.loads(r['payload']).get('record',{}).get('numero')==p.get('numero')]
+                    if not rows:raise ValueError('Contrat introuvable.')
+                    for op_id in rows:c.execute('DELETE FROM invites WHERE op_id=?',(op_id,))
+                    return 200,{'ok':True}
                 if path=='/api/share-contract':
                     row=next((r for r in c.execute('SELECT * FROM ops ORDER BY created DESC,id DESC') if json.loads(r['payload']).get('record',{}).get('numero')==p.get('numero') and json.loads(r['payload']).get('signature')),None)
                     if not row:raise ValueError('Synchronisez le contrat signé avant de le partager.')

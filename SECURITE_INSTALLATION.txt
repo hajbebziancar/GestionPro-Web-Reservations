@@ -1,0 +1,52 @@
+GESTION PRO - MISE A JOUR SECURITE
+
+1. Sauvegardez votre base Gestion Pro et ses documents sur le PC.
+2. Envoyez le contenu de ce dossier dans votre depot GitHub existant.
+   Ne deposez jamais mobile_sync_config.json, une base de donnees,
+   un fichier .env ou des jetons sur GitHub.
+3. Railway, service GestionPro-Web-Reservations, Variables :
+   COOKIE_SECURE = 1
+   Conservez GP_PC_TOKEN, GP_MOBILE_TOKEN, GESTIONPRO_API_TOKEN,
+   GP_RELAY_DB et le volume /data existants.
+4. Si votre compte administrateur existe, GP_SETUP_KEY peut rester absent :
+   la creation publique est bloquee. Pour une PREMIERE installation uniquement,
+   ajoutez GP_SETUP_KEY avec un secret aleatoire de 32 caracteres minimum,
+   deployez, ouvrez /admin/setup?key=VOTRE_SECRET en HTTPS,
+   creez le compte, puis supprimez GP_SETUP_KEY et redeployez.
+   Ne partagez pas cette adresse. Les comptes existants restent utilisables.
+5. Attendez le deploiement Railway reussi et reconnectez l'administration.
+6. Fermez et rouvrez Android. Si l'ancienne version reste affichee, fermez tous
+   les onglets Gestion Pro puis rouvrez. NE SUPPRIMEZ PAS les donnees du site.
+7. Android demande un mot de passe LOCAL de 10 caracteres minimum et sa
+   confirmation. Ce n'est pas le jeton Railway. Gardez-le dans un emplacement
+   protege : aucun recuperateur n'est disponible.
+   Les donnees, contrats, PDF et transferts en attente sont conserves puis
+   chiffres dans IndexedDB (AES-GCM, cle derivee PBKDF2-SHA256).
+   Verrouillage par rechargement apres 10 minutes sans interaction.
+   Enregistrez votre formulaire avant de laisser l'app inactive.
+8. Pour retirer un lien client Android : ouvrez les actions de partage/signature
+   du contrat, cliquez Revoquer les liens de ce contrat. Les liens existants
+   de ce contrat deviennent inutilisables, sans supprimer le contrat ni PDF.
+   Vous pouvez ensuite creer un nouveau lien. Validite habituelle : 48 heures.
+   Les anciens liens /signature/ du PC ont une API de revocation authentifiee
+   POST /api/signatures/<jeton-du-lien>/revoke; aucun bouton PC ajoute ici.
+9. Verifiez : administration sans connexion inaccessible; connexion valide;
+   synchronisation PC et telephone; documents existants; nouveau PDF;
+   lien revoque inaccessible; fermeture puis deverrouillage Android.
+
+PROTECTIONS
+- Premier administrateur soumis a une cle privee d'installation.
+- Sessions administrateur expirees apres 30 minutes d'inactivite.
+- Cookie Secure sur Railway (COOKIE_SECURE=1 explicite recommande).
+- Limite de 10 tentatives administrateur par adresse / 15 minutes.
+- Limite des erreurs de jeton relais : 10 / 15 minutes, blocage temporaire.
+- Donnees Android chiffreess au repos, cle uniquement en memoire.
+- Liens Android revocables. Les destinataires peuvent toujours transmettre
+  un lien valide ou leur copie PDF. Pas de verification SMS ajoutee.
+
+LIMITES DE VERIFICATION
+Tests locaux : syntaxe Python/JavaScript, limitation persistante, migration
+et chiffrement Android, refus API sans jeton, revocation sans effacer contrat.
+Tests reels sur votre telephone et site Railway restent a effectuer.
+Aucun changement de votre hebergement ni compte Railway effectue automatiquement.
+Cette mise a jour ne remplace pas un audit complet ni la protection du telephone.

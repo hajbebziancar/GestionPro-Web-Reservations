@@ -3,8 +3,9 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from functools import wraps
 from pathlib import Path
-from datetime import datetime, date
-import sqlite3, secrets, os, re, uuid
+from datetime import datetime, date, timedelta
+import sqlite3, secrets, os, re, uuid, time
+from security_limits import AttemptLimiter
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = Path(os.environ['GESTIONPRO_DATA_DIR']).expanduser().resolve() if os.environ.get('GESTIONPRO_DATA_DIR') else None
@@ -27,9 +28,12 @@ app.config.update(
     SECRET_KEY=os.environ.get('FLASK_SECRET_KEY', SECRET_KEY),
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='Lax',
-    SESSION_COOKIE_SECURE=os.environ.get('COOKIE_SECURE','0') == '1',
+    SESSION_COOKIE_SECURE=os.environ.get('COOKIE_SECURE','1' if (os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('RAILWAY_PROJECT_ID')) else '0') == '1',
+    PERMANENT_SESSION_LIFETIME=timedelta(minutes=30),
     MAX_CONTENT_LENGTH=20 * 1024 * 1024,
 )
+
+login_limiter = AttemptLimiter(DB_PATH.parent / 'security_limits.sqlite3')
 
 STATUS_ALLOWED = {'EN ATTENTE','CONFIRMEE','ANNULEE'}
 VEHICLE_STATUS_ALLOWED = {'EN SERVICE','HORS SERVICE'}
@@ -128,8 +132,11 @@ def admin_count():
 def login_required(fn):
     @wraps(fn)
     def wrapped(*args, **kwargs):
+        if session.get('web_user') and time.time()-session.get('_last_active',0)>1800:
+            session.clear()
         if not session.get('web_user'):
             return redirect(url_for('admin_login', next=request.path))
+        session['_last_active']=time.time()
         return fn(*args, **kwargs)
     return wrapped
 
@@ -283,6 +290,11 @@ def reserve():
 def admin_setup():
     if admin_count() > 0:
         return redirect(url_for('admin_login'))
+    setup_key=os.environ.get('GP_SETUP_KEY','').strip()
+    if not setup_key:abort(403, 'Création administrateur désactivée.')
+    supplied=request.args.get('key','') or request.form.get('setup_key','')
+    if supplied and secrets.compare_digest(supplied,setup_key):session['_setup_allowed']=__import__('hashlib').sha256(setup_key.encode()).hexdigest()
+    if not secrets.compare_digest(session.get('_setup_allowed',''),__import__('hashlib').sha256(setup_key.encode()).hexdigest()):abort(403, 'Clé installation requise.')
     if request.method == 'POST':
         username = request.form.get('username','').strip()
         password = request.form.get('password','')
@@ -305,12 +317,13 @@ def admin_login():
     if admin_count() == 0:
         return redirect(url_for('admin_setup'))
     if request.method == 'POST':
+        if not login_limiter.attempt('login:'+str(request.remote_addr)):abort(429, 'Trop de tentatives. Réessayez dans 15 minutes.')
         username = request.form.get('username','').strip()
         password = request.form.get('password','')
         with db() as c:
             u = c.execute('SELECT * FROM web_users WHERE username=? AND active=1',(username,)).fetchone()
         if u and check_password_hash(u['password_hash'], password):
-            session.clear(); session['web_user']=u['username']; session['_csrf']=secrets.token_urlsafe(32)
+            session.clear(); session.permanent=True; session['_last_active']=time.time(); session['web_user']=u['username']; session['_csrf']=secrets.token_urlsafe(32)
             audit('LOGIN')
             return redirect(url_for('admin_dashboard'))
         flash('Identifiants incorrects.', 'error')

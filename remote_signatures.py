@@ -184,3 +184,9 @@ def validate_contract(content):
                     raise ValueError('Les images du contrat doivent être intégrées au document.')
                 if key.lower() in {'href','xlink:href'} and (value or '').lower().startswith(('file:','javascript:')):raise ValueError('Lien interdit dans le contrat.')
     Checker().feed(content)
+
+@bp.post('/api/signatures/<token>/revoke')
+def revoke(token):
+    authorized()
+    with db() as c:c.execute('UPDATE signatures SET expires=0 WHERE token=?',(token,))
+    return jsonify(ok=True)

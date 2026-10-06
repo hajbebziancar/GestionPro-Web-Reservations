@@ -164,9 +164,13 @@ def apply_one(c,op,root):
                 c.execute('UPDATE clients SET '+','.join(k+'=?' for k in CLIENT_FIELDS[1:])+' WHERE code=?',[r[k] for k in CLIENT_FIELDS[1:]]+[r['code']])
         elif kind=='vehicle_update':
             old=c.execute('SELECT * FROM vehicles WHERE code=?',(r['code'],)).fetchone()
-            if not old or clean(dict(old),VEHICLE_FIELDS)!=clean(op['original'],VEHICLE_FIELDS):raise ValueError('Le véhicule a changé sur le PC. Réactualisez son compteur.')
-            km=int(r['compteur'])
-            if km<int(old['compteur'] or 0):raise ValueError('Le compteur ne peut pas diminuer.')
+            if not old:raise ValueError('Véhicule absent du PC.')
+            km=int(r['compteur']);current=int(old['compteur'] or 0)
+            original=op.get('original',{}).get('compteur')
+            if original is None:raise ValueError('Compteur initial absent. Réactualisez le véhicule.')
+            if km<int(original):raise ValueError('Le compteur ne peut pas diminuer.')
+            if km<current:raise ValueError('Le compteur PC est déjà supérieur ('+str(current)+' km). Réactualisez le véhicule.')
+            # An independent price/photo/service edit must not reject a newer odometer.
             c.execute('UPDATE vehicles SET compteur=? WHERE code=?',(km,r['code']))
             resync_maintenance(c,r['code'])
         elif kind=='contract_create':
