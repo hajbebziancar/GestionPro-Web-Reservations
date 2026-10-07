@@ -1,0 +1,1 @@
+Android 2.9.8 : bouton bleu Réserver ajouté directement dans chaque fiche client, sous les autres actions. Ouvre la création de réservation avec le client sélectionné. Pour une nouvelle fiche, enregistrer le client avant de réserver. Le bouton Établir un contrat et les historiques sont conservés.

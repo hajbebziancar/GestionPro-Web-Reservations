@@ -1,0 +1,1 @@
+Version 2.9.7 : bouton Réservations dans la barre principale Android ; accès à la liste et à la création. Bouton Établir un contrat dans la fiche client, client sélectionné et coordonnées reprises automatiquement. Conserve liste clients, reçu PDF web et disponibilité dès le jour de retour.
