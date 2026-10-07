@@ -4,10 +4,11 @@
 const rawGet=GP.get,rawSet=GP.set,enc=new TextEncoder(),dec=new TextDecoder();let key,salt,unlockedState;
 // Encode bounded chunks: photos and PDF documents must not create millions of array entries.
 const b64=bytes=>{const view=new Uint8Array(bytes),chunks=[];for(let i=0;i<view.length;i+=32768)chunks.push(String.fromCharCode(...view.subarray(i,i+32768)));return btoa(chunks.join(''))};
-const un64=text=>Uint8Array.from(atob(text),x=>x.charCodeAt(0));
+const un64=text=>{const decoded=atob(text),bytes=new Uint8Array(decoded.length);for(let i=0;i<decoded.length;i++)bytes[i]=decoded.charCodeAt(i);return bytes};
 async function derive(password,salt){const material=await crypto.subtle.importKey('raw',enc.encode(password),'PBKDF2',false,['deriveKey']);return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:310000,hash:'SHA-256'},material,{name:'AES-GCM',length:256},false,['encrypt','decrypt'])}
 async function seal(value){const iv=crypto.getRandomValues(new Uint8Array(12));const ciphertext=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,enc.encode(JSON.stringify(value)));return {encrypted:1,salt:b64(salt),iv:b64(iv),ciphertext:b64(ciphertext)}}
-async function readEnvelope(value){return JSON.parse(dec.decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:un64(value.iv)},key,un64(value.ciphertext))))}
+function openingStatus(message){const el=document.getElementById('login-error');if(el)el.textContent=message}
+async function readEnvelope(value){openingStatus('Lecture des données chiffrées…');const bytes=un64(value.ciphertext);openingStatus('Déchiffrement des données…');const plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:un64(value.iv)},key,bytes);openingStatus('Chargement de la base locale…');return JSON.parse(dec.decode(plain))}
 
 GP.loginScreen=(title,creating=false,note='')=>new Promise(resolve=>{
  document.body.classList.add('connection-page','hbz-login');
@@ -20,7 +21,7 @@ GP.loginScreen=(title,creating=false,note='')=>new Promise(resolve=>{
 GP.unlock=async()=>{
  if(!crypto.subtle)throw Error('HTTPS nécessaire pour protéger les données.');
  const old=await rawGet('state');
- if(old?.encrypted){salt=un64(old.salt);let opened=false;for(let n=0;n<5;n++){const password=await GP.loginScreen('Connexion',false,n?'Mot de passe incorrect. Réessayez.':'Mot de passe local de ce téléphone.');if(password===null)throw Error('Application verrouillée. Rechargez pour déverrouiller.');try{key=await derive(password,salt);unlockedState=await readEnvelope(old);opened=true;break}catch(e){document.body.classList.add('hbz-login');document.getElementById('login-error').textContent='Mot de passe incorrect.'}}if(!opened)throw Error('Application verrouillée. Réessayez plus tard.');}
+ if(old?.encrypted){salt=un64(old.salt);let opened=false;for(let n=0;n<5;n++){const password=await GP.loginScreen('Connexion',false,n?'Mot de passe incorrect. Réessayez.':'Mot de passe local de ce téléphone.');if(password===null)throw Error('Application verrouillée. Rechargez pour déverrouiller.');try{openingStatus('Vérification du mot de passe…');key=await derive(password,salt);unlockedState=await readEnvelope(old);opened=true;break}catch(e){document.body.classList.add('hbz-login');document.getElementById('login-error').textContent='Mot de passe incorrect.'}}if(!opened)throw Error('Application verrouillée. Réessayez plus tard.');}
  else{let password=await GP.loginScreen('Première connexion',true,'Créez un mot de passe local de 10 caractères minimum. Conservez-le : il protège les données de ce téléphone et ne peut pas être récupéré.');if(!password||password.length<10)throw Error('Mot de passe de 10 caractères minimum requis. Rechargez pour continuer.');salt=crypto.getRandomValues(new Uint8Array(16));key=await derive(password,salt);unlockedState=old||{data:null,queue:[],archives:{},config:{token:''},lastSync:null};await rawSet('state',await seal(unlockedState));}
 };
 GP.get=async name=>{if(name==='state'&&unlockedState!==undefined){const value=unlockedState;unlockedState=undefined;return value}const value=await rawGet(name);if(name==='state'&&value?.encrypted){if(!key)throw Error('Application verrouillée.');return readEnvelope(value)}return value};
