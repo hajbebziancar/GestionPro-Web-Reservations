@@ -1,0 +1,12 @@
+INTERFACE HBZ RENT CAR ANDROID — 07/10/2026
+
+Décompresser ce ZIP, ouvrir GestionPro-Web-Reservations-main et déposer son contenu dans le dépôt GitHub existant. Valider Commit changes, puis attendre le succès du déploiement Railway.
+Conserver les variables Railway et le volume /data. Ne pas remplacer la base du PC.
+Sur Android, fermer complètement l'application puis la rouvrir avec Internet. Si l'ancien écran reste affiché, rouvrir une seconde fois après le chargement de la mise à jour. Ne pas effacer les données du navigateur.
+
+Interface : bleu marine et boutons bleus, logo société, bannière constituée des photos réellement synchronisées depuis le PC, cinq cartes avec détails, véhicules compacts, fiche client Informations/Historique/Documents, contrat Client/Véhicule/Contrat/Signature.
+Les champs sont conservés lorsqu'on change d'onglet. Enregistrement avant signature, confirmation de signature et PDF/WhatsApp utilisent les fonctions existantes.
+Le fond de connexion reste un bleu dégradé. L'accès garde la clé Android et le mot de passe local chiffré existants ; cette mise à jour ne crée pas de comptes administrateur/utilisateur séparés.
+Les clients et contrats restent accessibles par recherche, conformément à votre demande.
+Les fonctions de synchronisation des photos et du compteur corrigées dans la version précédente sont conservées.
+Aucun nouveau module Chèque express ni second conducteur n'est ajouté par ce changement d'interface ; ces fonctions nécessitent une intégration dédiée au contrat et au PC.
