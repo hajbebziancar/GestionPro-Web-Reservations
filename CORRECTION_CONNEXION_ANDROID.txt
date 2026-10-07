@@ -1,0 +1,9 @@
+CORRECTION CONNEXION ANDROID — VERSION 2.9.1
+
+Décompressez et remplacez les fichiers du dépôt GitHub, puis redéployez sur Railway. Fermez puis rouvrez Gestion Pro Android pour charger cette version.
+
+Corrections : un seul déchiffrement de la base après saisie du mot de passe, suppression de la réécriture complète au démarrage, conversion base64 par blocs pour limiter la mémoire, prévention des doubles clics et des formulaires de liaison simultanés, chargement différé des photos.
+
+Le mot de passe local, le format de chiffrement et les données existantes sont conservés. Ne supprimez pas les données du navigateur.
+
+Validation : test de déverrouillage avec une base de 8 Mio, compatibilité du chiffrement, absence de réécriture à l’ouverture, syntaxe JavaScript et tests de domaine mobile. La cause exacte du plantage Chrome sur votre téléphone reste à confirmer après installation.
