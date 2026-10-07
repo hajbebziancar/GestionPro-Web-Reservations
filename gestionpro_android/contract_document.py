@@ -24,7 +24,7 @@ class Value:
     def get(self):return self.v
 class Document:
     def __init__(self,frozen,signature=''):
-        self.signature=signature;self.settings=frozen['settings'];r=frozen['record'];c=frozen['client'];v=frozen['vehicle']
+        self.agency_signature=frozen['record'].get('agency_signature','');self.signature=signature;self.settings=frozen['settings'];r=frozen['record'];c=frozen['client'];v=frozen['vehicle']
         self.photo_uri=v.get('photo_uri','')
         fields={'contract_no':r['numero'],'client_code':c['code'],'last_name':c.get('nom'),'first_name':c.get('prenom'),'cin':c.get('cin'),'birth_date':c.get('date_naissance'),'address':c.get('adresse'),'city':c.get('ville'),'phone':c.get('telephone'),'license_no':c.get('permis'),'license_date':c.get('date_permis'),'vehicle_code':v['code'],'vehicle_model':v.get('modele'),'plate':v.get('immatriculation'),'chassis':v.get('chassis'),'km_start':r.get('km_depart'),'date_start':r['date_depart'],'time_start':r.get('heure_depart'),'date_end':r['date_retour'],'time_end':r.get('heure_retour'),'duration':r.get('duree'),'daily_price':r.get('prix'),'total':r.get('montant'),'paid':r.get('reglement'),'balance':r.get('reste')}
         for target,key in [('age','date_naissance'),('license_age','date_permis')]:

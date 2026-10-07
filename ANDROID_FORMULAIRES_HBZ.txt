@@ -1,12 +1,20 @@
-Version 2.9.4 — formulaires Android HBZ
+VERSION 2.9.5 — FORMULAIRES HBZ ANDROID
 
-Fiche client : saisie par onglets, âge et ancienneté calculés, documents PDF et historique existants conservés.
-Fiche véhicule : informations, entretien et alertes, photo et historique. Le compteur reste modifiable sur Android ; les autres caractéristiques se modifient sur le PC.
-Contrat : cinq étapes, deuxième conducteur optionnel, lieux de départ/retour, mode de paiement, carburant, état et équipements. Les champs sont conservés dans la base PC et resynchronisés.
-Connexion : conversion base64 en blocs, déchiffrement initial unique et prévention des doubles clics.
+Les trois écrans ont été reconstruits à partir des maquettes fournies :
+- Fiche client : en-tête bleu marine, boutons Nouveau/Modifier/Enregistrer/Supprimer, recherche, trois onglets, photo, âge jaune, ancienneté verte, CIN/permis recto-verso, document PDF, observations et actions de contact.
+- Fiche véhicule : les quatre boutons, les quatre onglets, photo, informations, statut/situation, kilométrage, jauge de carburant, cartes d’entretien colorées, observations et six photos.
+- Contrat : cinq repères d’étapes et dix sections dans l’ordre de la maquette, conducteur principal et deuxième conducteur, véhicule, location, tarifs/remise/paiement, état et six photos, équipements, conditions/notes, signatures client/agence et neuf actions.
 
-Il ne s’agit pas d’un APK natif : l’application Android existante reste une application Web installable. Les maquettes sont adaptées aux fonctions disponibles. L’import de photos de dégâts, la signature agence et la remise en pourcentage ne sont pas ajoutés dans cette version. Les suppressions de fiches liées à un contrat restent gérées sur PC.
+Les couleurs, cadres et boutons sont appliqués au véritable formulaire ; les données affichées proviennent de la base. Les photos de clients et de véhicules restent des emplacements à remplir lorsqu’aucune photo n’a été synchronisée.
 
-Installer le ZIP complet côté serveur et mettre à jour le module PC ensemble. Ouvrir avec HTTPS, relancer après mise à jour pour charger la version 2.9.4. Ne pas effacer les données du téléphone : conserver les sauvegardes avant tout changement.
+Les boutons Supprimer des fiches retirent le client des listes actives ou mettent le véhicule hors service. Ils conservent les données nécessaires aux historiques. Supprimer dans un nouveau contrat abandonne le brouillon non enregistré.
 
-Validation : tests JavaScript du domaine et tests de synchronisation des nouveaux champs. Deux tests PDF signé ne peuvent pas être validés dans cet environnement car Flask est absent. Le rendu sur un téléphone Android doit encore être vérifié.
+PDF et Imprimer produisent un aperçu non signé tant que la signature n’est pas confirmée. WhatsApp et Email enregistrent le contrat, puis préparent son lien de consultation et signature. L’utilisateur valide l’envoi dans son application de messagerie.
+
+INSTALLATION
+Mettre à jour le projet serveur complet et le module de synchronisation PC fournis ensemble. Après déploiement, fermer puis rouvrir Gestion Pro Android pour charger la version 2.9.5. Conserver les données locales et les sauvegardes existantes.
+
+VÉRIFICATION
+18 tests Python réussis, y compris synchronisation et PDF signé recto verso, avec Chromium piloté par Playwright dans l’environnement de contrôle. Tests JavaScript du domaine réussis. Les trois formulaires ont été ouverts et capturés dans Chromium à 736 px et 393 px, sans erreur JavaScript ni débordement horizontal. Enregistrement du portrait et création d’un véhicule vérifiés dans le navigateur. Calcul de remise et deuxième conducteur vérifiés dans le brouillon.
+
+Les captures du dossier VERIFICATION_VISUELLE utilisent des données de démonstration et montrent le rendu de l’interface réalisée. Elles ne représentent pas une validation sur un téléphone Android physique ou sur votre serveur Railway.

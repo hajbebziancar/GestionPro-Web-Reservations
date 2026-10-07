@@ -65,13 +65,22 @@ def inline_picture(value,max_size=(800,800)):
         return ''
 def vehicle_snapshot(c,row):
     v={**clean(dict(row),VEHICLE_FIELDS),**{k:row[k] for k in row.keys() if k in ('assurance_fin','controle_technique','prochaine_vidange','vidange_restant','prochaine_adblue','adblue_restant','prochaine_chaine','chaine_restant')}}
+    profile=c.execute("SELECT payload FROM module_records WHERE module='mobile_vehicle_profile' AND record_id=?",(row['code'],)).fetchone()
+    v['hbz_profile']=json.loads(profile[0]) if profile else {}
     v['photo_uri']=inline_picture(dict(row).get('photo',''))
     brand=str(row['modele'] or '').split()[0].lower() if row['modele'] else ''
     v['brand_logo_uri']=next((inline_picture(str(path)) for ext in ('.png','.jpg') if (path:=ROOT/'logos_marques'/(brand+ext)).is_file()),'')
     state=c.execute("SELECT payload FROM module_records WHERE module='vehicle_condition' AND record_id=?",(row['code'],)).fetchone()
     if state:
         v['condition']=json.loads(state[0]);v['condition']['drawing']=''
+    if v['hbz_profile'].get('photo_uri'):v['photo_uri']=v['hbz_profile']['photo_uri']
     return v
+
+def client_snapshot(c,row):
+    record=clean(dict(row),CLIENT_FIELDS)
+    profile=c.execute("SELECT payload FROM module_records WHERE module='mobile_client_profile' AND record_id=?",(record['code'],)).fetchone()
+    if profile:record['hbz_profile']=json.loads(profile[0])
+    return record
 
 def contract_snapshot(c,row):
     record=dict(row)
@@ -81,7 +90,7 @@ def contract_snapshot(c,row):
     return record
 
 def snapshot(c):
-    return {'clients':[clean(dict(r),CLIENT_FIELDS) for r in c.execute('SELECT * FROM clients')],
+    return {'clients':[client_snapshot(c,r) for r in c.execute('SELECT * FROM clients')],
       'vehicles':[vehicle_snapshot(c,r) for r in c.execute('SELECT * FROM vehicles WHERE service=1')],
       'contracts':[contract_snapshot(c,r) for r in c.execute('SELECT * FROM contracts')],
       'contract_vehicles':[vehicle_snapshot(c,r) for r in c.execute('SELECT * FROM vehicles WHERE service<>1 AND code IN (SELECT vehicle_code FROM contracts)')],
@@ -158,6 +167,7 @@ def apply_one(c,op,root):
             if not c.execute('SELECT 1 FROM client_documents WHERE file_path=?',(str(destination),)).fetchone():c.execute('INSERT INTO client_documents(client_code,document_type,file_path,created_at) VALUES(?,?,?,?)',(r['client_code'],'AUTRE',str(destination),now))
             message='PDF enregistré dans le dossier documentaire du client sur le PC.'
         elif kind.startswith('client_'):
+            profile=r.get('hbz_profile')
             r=clean(r,CLIENT_FIELDS)
             if not r['code'] or not str(r['nom']).strip() or not str(r['cin']).strip():raise ValueError('Nom et CIN obligatoires.')
             duplicate=c.execute('SELECT code FROM clients WHERE UPPER(TRIM(cin))=UPPER(TRIM(?)) AND code<>?',(r['cin'],r['code'])).fetchone()
@@ -167,8 +177,18 @@ def apply_one(c,op,root):
                 if old:raise ValueError('Code client déjà utilisé.')
                 c.execute('INSERT INTO clients('+','.join(CLIENT_FIELDS)+') VALUES('+','.join('?' for _ in CLIENT_FIELDS)+')',list(r.values()))
             else:
-                if not old or clean(dict(old),CLIENT_FIELDS)!=op['original']:raise ValueError('Fiche client modifiée sur le PC. Réactualisez avant de recommencer.')
+                if not old or clean(dict(old),CLIENT_FIELDS)!=clean(op['original'],CLIENT_FIELDS):raise ValueError('Fiche client modifiée sur le PC. Réactualisez avant de recommencer.')
                 c.execute('UPDATE clients SET '+','.join(k+'=?' for k in CLIENT_FIELDS[1:])+' WHERE code=?',[r[k] for k in CLIENT_FIELDS[1:]]+[r['code']])
+            if isinstance(profile,dict):
+                previous=c.execute("SELECT payload FROM module_records WHERE module='mobile_client_profile' AND record_id=?",(r['code'],)).fetchone()
+                if kind=='client_update' and (json.loads(previous[0]) if previous else {})!=op['original'].get('hbz_profile',{}):raise ValueError('Documents client modifiés sur le PC. Réactualisez la fiche.')
+                c.execute('INSERT OR REPLACE INTO module_records(module,record_id,payload,created_at) VALUES(?,?,?,?)',('mobile_client_profile',r['code'],json.dumps(profile,ensure_ascii=False),now))
+        elif kind=='vehicle_create':
+            if not r.get('modele') or not r.get('immatriculation'):raise ValueError('Modèle et matricule obligatoires.')
+            if int(r.get('compteur',0))<0 or money(r.get('prix',0))<0:raise ValueError('Compteur ou tarif invalide.')
+            cols=VEHICLE_FIELDS
+            c.execute('INSERT INTO vehicles('+','.join(cols)+') VALUES('+','.join('?' for _ in cols)+')',[r.get(k,'') for k in cols])
+            c.execute('INSERT OR REPLACE INTO module_records(module,record_id,payload,created_at) VALUES(?,?,?,?)',('mobile_vehicle_profile',r['code'],json.dumps(r.get('hbz_profile',{}),ensure_ascii=False),now))
         elif kind=='vehicle_update':
             old=c.execute('SELECT * FROM vehicles WHERE code=?',(r['code'],)).fetchone()
             if not old:raise ValueError('Véhicule absent du PC.')
@@ -179,6 +199,14 @@ def apply_one(c,op,root):
             if km<current:raise ValueError('Le compteur PC est déjà supérieur ('+str(current)+' km). Réactualisez le véhicule.')
             # An independent price/photo/service edit must not reject a newer odometer.
             c.execute('UPDATE vehicles SET compteur=? WHERE code=?',(km,r['code']))
+            if r.get('hbz_full_edit'):
+                for field in ('modele','immatriculation','chassis','prix','service'):
+                    if str(dict(old).get(field,''))!=str(op['original'].get(field,'')):raise ValueError('Véhicule modifié sur le PC : réactualisez la fiche.')
+                previous=c.execute("SELECT payload FROM module_records WHERE module='mobile_vehicle_profile' AND record_id=?",(r['code'],)).fetchone()
+                if (json.loads(previous[0]) if previous else {})!=op['original'].get('hbz_profile',{}):raise ValueError('Photos ou détails véhicule modifiés. Réactualisez la fiche.')
+                if not str(r.get('modele','')).strip() or not str(r.get('immatriculation','')).strip() or money(r['prix'])<0 or int(r['service']) not in (0,1):raise ValueError('Informations véhicule invalides.')
+                c.execute('UPDATE vehicles SET modele=?,immatriculation=?,chassis=?,prix=?,service=? WHERE code=?',[r[k] for k in ('modele','immatriculation','chassis','prix','service','code')])
+                c.execute('INSERT OR REPLACE INTO module_records(module,record_id,payload,created_at) VALUES(?,?,?,?)',('mobile_vehicle_profile',r['code'],json.dumps(r.get('hbz_profile',{}),ensure_ascii=False),now))
             resync_maintenance(c,r['code'])
         elif kind=='contract_create':
             existing=c.execute('SELECT * FROM contracts WHERE numero=?',(r['numero'],)).fetchone()
@@ -203,12 +231,15 @@ def apply_one(c,op,root):
             vehicle=available(c,r['vehicle_code'],start,end,r.get('reservation_ref',''),r['numero'] if existing else '')
             if any(str(vehicle.get(k,''))!=str(frozen['vehicle'].get(k,'')) for k in ('code','modele','immatriculation','chassis')):raise ValueError('Identité du véhicule modifiée : refaire le contrat et sa signature.')
             days=max(1,(end.date()-start.date()).days);price=money(r['prix']);paid=money(r['reglement']);total=round(days*price,2)
+            if 'discount_percent' in r:
+                discount=float(r['discount_percent']);base=money(r['base_price'])
+                if not math.isfinite(discount) or not 0<=discount<=100 or abs(price-round(base*(1-discount/100),2))>.005:raise ValueError('Remise du contrat invalide.')
             if int(r['duree'])!=days or abs(money(r['montant'])-total)>.005 or paid>total or abs(money(r['reste'])-(total-paid))>.005:raise ValueError('Calcul du contrat invalide.')
             if not existing and int(r['km_depart'])<int(vehicle.get('compteur') or 0):raise ValueError('Kilométrage de départ inférieur au compteur PC.')
             cols=('numero','client_code','second_code','vehicle_code','date_depart','heure_depart','date_retour','heure_retour','duree','prix','montant','reglement','reste','km_depart','km_retour','created_at')
             values={**r,'second_code':r.get('second_code',''),'km_retour':0,'created_at':now}
             if not existing:c.execute('INSERT INTO contracts('+','.join(cols)+') VALUES('+','.join('?' for _ in cols)+')',[values[k] for k in cols])
-            c.execute('INSERT OR REPLACE INTO module_records(module,record_id,payload,created_at) VALUES(?,?,?,?)',('client_rapide_contract',r['numero'],json.dumps({'ref_notes':r.get('notes',''),'mobile_details':{k:r.get(k) for k in ('departure_location','return_location','payment_mode','fuel_level','condition')}},ensure_ascii=False),now))
+            c.execute('INSERT OR REPLACE INTO module_records(module,record_id,payload,created_at) VALUES(?,?,?,?)',('client_rapide_contract',r['numero'],json.dumps({'ref_notes':r.get('notes',''),'mobile_details':{k:r.get(k) for k in ('departure_location','return_location','payment_mode','fuel_level','condition','agency_signature','base_price','discount_percent')}},ensure_ascii=False),now))
             if isinstance(r.get('condition'),dict):
                 c.execute('INSERT OR REPLACE INTO module_records(module,record_id,payload,created_at) VALUES(?,?,?,?)',('contract_vehicle_condition',r['numero'],json.dumps(r['condition'],ensure_ascii=False),now))
             reservation_ref=r.get('reservation_ref')

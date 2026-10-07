@@ -47,7 +47,7 @@ class Relay:
                 key='clients';identity='code';record=op['record']
             elif op['kind']=='contract_create':
                 key='contracts';identity='numero';record={**op['record'],'signature':op.get('signature',''),'frozen':op.get('frozen'), 'pdf':op.get('pdf','')}
-            elif op['kind']=='vehicle_update':
+            elif op['kind'] in ('vehicle_update','vehicle_create'):
                 key='vehicles';identity='code';record=op['record']
             elif op['kind'].startswith('reservation_'):
                 key='reservations';identity='reference';record=op['record']
@@ -65,7 +65,7 @@ class Relay:
         snapshot['operations']=ops
         return snapshot
     def validate(self,op):
-        if not isinstance(op,dict) or op.get('kind') not in ('client_create','client_update','contract_create','reservation_create','reservation_update','maintenance_create','maintenance_update','vehicle_update','document_upload'):raise ValueError('Opération inconnue.')
+        if not isinstance(op,dict) or op.get('kind') not in ('client_create','client_update','contract_create','reservation_create','reservation_update','maintenance_create','maintenance_update','vehicle_update','vehicle_create','document_upload'):raise ValueError('Opération inconnue.')
         if not isinstance(op.get('id'),str) or not 8<=len(op['id'])<=80:raise ValueError('Identifiant invalide.')
         if op.get('trusted_web'):raise ValueError('Réservation web importée uniquement par le serveur.')
         r=op.get('record')
@@ -75,8 +75,8 @@ class Relay:
         elif op['kind'].startswith('client'):
             if not r.get('code') or not r.get('cin') or not r.get('nom'):raise ValueError('Code, CIN et nom obligatoires.')
             if op['kind']=='client_update' and not isinstance(op.get('original'),dict):raise ValueError('Version d’origine absente.')
-        elif op['kind']=='vehicle_update':
-            if not r.get('code') or not isinstance(op.get('original'),dict):raise ValueError('Compteur incomplet.')
+        elif op['kind'] in ('vehicle_update','vehicle_create'):
+            if not r.get('code') or op['kind']=='vehicle_update' and not isinstance(op.get('original'),dict):raise ValueError('Véhicule incomplet.')
         elif op['kind'].startswith(('reservation_','maintenance_')):
             if not r.get('reference') or not r.get('vehicle'):raise ValueError('Référence et véhicule obligatoires.')
             if op['kind'].endswith('_update') and not isinstance(op.get('original'),dict):raise ValueError('Version d’origine absente.')
