@@ -1,0 +1,1 @@
+Reçu PDF disponible après réservation et dans l’administration. Envoi WhatsApp préparé avec lien signé valable 7 jours ; envoi validé par l’utilisateur. Téléchargement possible pour pièce jointe email. Statut et montants actualisés depuis la réservation. Publier cette version et installer requirements.txt.

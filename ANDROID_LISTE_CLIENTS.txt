@@ -1,0 +1,1 @@
+Version Android 2.9.6 : la rubrique Clients affiche tous les clients actifs dès son ouverture. Recherche conservée par code, CIN, nom, prénom et téléphone. Cliquer un client ouvre sa fiche. Les clients archivés restent exclus.

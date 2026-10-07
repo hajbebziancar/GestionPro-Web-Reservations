@@ -1,0 +1,3 @@
+Administration du site : bouton rouge Supprimer pour les réservations annulées uniquement. Confirmation avant suppression, contrôle du statut sur le serveur, authentification et protection CSRF. Suppression de la réservation sur le site et trace dans le journal administratif ; les historiques indépendants déjà synchronisés sur PC restent conservés. Filtres de recherche conservés après suppression. 7 tests du site réussis.
+
+Pour appliquer : publier les fichiers du dossier GestionPro-Web-Reservations-main sur le dépôt GitHub connecté à Railway, puis attendre le déploiement. Les maquettes Android de la version précédente sont incluses.
