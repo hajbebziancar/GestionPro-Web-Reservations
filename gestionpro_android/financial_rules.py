@@ -478,6 +478,18 @@ def summary(data,start=None,end=None,include_details=False):
         f=Financial(c);s=f._parse_french_date(start) if start else None;e=f._parse_french_date(end) if end else None
         if start and not s or end and not e or s and e and e<s:raise ValueError('Période financière invalide.')
         totals=f._financial_totals(s,e)
+        rental_count=0; rental_days=0.0; daily_revenue=0.0
+        today=datetime.now().replace(hour=0,minute=0,second=0,microsecond=0)
+        for r in data.get('contracts',[]):
+            duration=max(1.0,f._number(r.get('duree')))
+            args=(r.get('date_depart'),r.get('date_retour'),r.get('duree'))
+            days=f._contract_allocated_parts(*args,duration,0,0,s,e)[0]
+            if days>0:rental_count+=1;rental_days+=days
+            if (s is None or today>=s) and (e is None or today<=e):
+                daily_revenue+=f._contract_allocated_parts(*args,max(0.0,f._number(r.get('montant'))),0,0,today,today)[0]
+        totals.update(rental_count=rental_count,rental_days=rental_days,daily_revenue=daily_revenue,
+                      average_daily=totals['revenue']/rental_days if rental_days else 0,
+                      expense_ratio=totals['expenses']/totals['revenue']*100 if totals['revenue'] else 0)
         if include_details:
             details={key:f.details(key,key,totals[key],s,e) for key in ('revenue','receivables','bank','cash','expenses')}
             return {'totals':totals,'details':{key:rows[:500] for key,rows in details.items()},'detail_counts':{key:len(rows) for key,rows in details.items()}}

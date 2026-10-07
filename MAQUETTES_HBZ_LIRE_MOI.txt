@@ -1,0 +1,9 @@
+MAQUETTES HBZ — CONNEXION ET FINANCES
+
+Remplacez les fichiers du dépôt GitHub par le contenu de ce dossier, puis redéployez sur Railway.
+Ouvrez ensuite /mobile/ et rechargez l’application pour récupérer la version 2.9.0.
+
+Connexion : saisie du mot de passe local avec affichage/masquage. Lors de la première installation, confirmation du mot de passe et saisie de la clé Android existante pour la liaison serveur.
+Finances : six cartes, actualisation, filtres de période, synthèse rapide calculée à partir des données PC et accès aux détails en cliquant sur les cartes. Aucun montant de démonstration n’est intégré.
+
+Validation : syntaxe JavaScript, tests de domaine mobile et vérification des nouveaux calculs réussis. Tests PDF/signature non terminés dans cet environnement (Flask absent). Contrôle visuel au navigateur indisponible (Chromium absent). Le fond photographique provient de la maquette fournie ; adaptation responsive du formulaire.
