@@ -56,6 +56,7 @@
       <label>Nom *<input name="nom" required maxlength="80" autocomplete="family-name"></label><label>Prénom *<input name="prenom" required maxlength="80" autocomplete="given-name"></label>
       <label>Téléphone *<input name="telephone" required maxlength="30" placeholder="06..." autocomplete="tel"></label><label>CIN<input name="cin" maxlength="40"></label>
       <label class="wide">Véhicule *<select id="vehicleSelect" name="code_vehicule" required><option value="">Choisir un véhicule...</option>{% for v in vehicles %}<option value="{{v.code_vehicule}}">{{v.marque}}{% if v.prix_jour %} — {{'%.0f'|format(v.prix_jour)}} MAD/jour{% endif %}</option>{% endfor %}</select></label>
+      <p class="full availability-rule">Le véhicule est disponible dès son jour de retour, indépendamment de l’heure de retour.</p>
       <label>Date départ *<input type="date" name="date_depart" required></label><label>Heure départ<select name="heure_depart">{% for h in ['08:00','09:00','10:00','11:00','12:00','14:00','15:00','16:00','17:00','18:00'] %}<option>{{h}}</option>{% endfor %}</select></label>
       <label>Date retour *<input type="date" name="date_retour" required></label><label>Heure retour<select name="heure_retour">{% for h in ['08:00','09:00','10:00','11:00','12:00','14:00','15:00','16:00','17:00','18:00'] %}<option>{{h}}</option>{% endfor %}</select></label>
       <label class="wide">Observation<textarea name="observation" maxlength="500" rows="3" placeholder="Besoin particulier, lieu souhaité, remarque..."></textarea></label>
