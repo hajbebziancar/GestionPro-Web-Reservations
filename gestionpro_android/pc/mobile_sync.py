@@ -73,10 +73,17 @@ def vehicle_snapshot(c,row):
         v['condition']=json.loads(state[0]);v['condition']['drawing']=''
     return v
 
+def contract_snapshot(c,row):
+    record=dict(row)
+    details=c.execute("SELECT payload FROM module_records WHERE module='client_rapide_contract' AND record_id=?",(record['numero'],)).fetchone()
+    if details:
+        payload=json.loads(details[0]);record.update(payload.get('mobile_details') or {});record['notes']=payload.get('ref_notes','')
+    return record
+
 def snapshot(c):
     return {'clients':[clean(dict(r),CLIENT_FIELDS) for r in c.execute('SELECT * FROM clients')],
       'vehicles':[vehicle_snapshot(c,r) for r in c.execute('SELECT * FROM vehicles WHERE service=1')],
-      'contracts':[dict(r) for r in c.execute('SELECT * FROM contracts')],
+      'contracts':[contract_snapshot(c,r) for r in c.execute('SELECT * FROM contracts')],
       'contract_vehicles':[vehicle_snapshot(c,r) for r in c.execute('SELECT * FROM vehicles WHERE service<>1 AND code IN (SELECT vehicle_code FROM contracts)')],
       **{name:module(c,name) for name in ('reservations','maintenance','expenses','checks','finance','supplier_payments','transfers','payments','contract_payment_mode')},
       'mobile_contract_drafts':module(c,'mobile_contract_draft'),
@@ -110,7 +117,7 @@ def archive(c,op,root):
     sign_folder=root/'signatures_clients';sign_folder.mkdir(exist_ok=True)
     (sign_folder/('signature_'+(''.join(x for x in str(number) if x.isalnum() or x in '-_')[:80] or 'contrat')+'.png')).write_bytes(png)
     (folder/(prefix+'.html')).write_text(document,encoding='utf-8');(folder/(prefix+'.png')).write_bytes(png);(folder/(prefix+'.pdf')).write_bytes(pdf)
-    record={'contract_no':number,'client_codes':[r['client_code']],'signed_at':datetime.now().isoformat(timespec='seconds'),'html':prefix+'.html','signature':prefix+'.png','pdf':prefix+'.pdf','sha256':hashlib.sha256(png).hexdigest(),'source':'Android autonome'}
+    record={'contract_no':number,'client_codes':list(dict.fromkeys(filter(None,[r['client_code'],r.get('second_code')]))),'signed_at':datetime.now().isoformat(timespec='seconds'),'html':prefix+'.html','signature':prefix+'.png','pdf':prefix+'.pdf','sha256':hashlib.sha256(png).hexdigest(),'source':'Android autonome'}
     temp=folder/(prefix+'.tmp');temp.write_text(json.dumps(record,ensure_ascii=False),encoding='utf-8');os.replace(temp,folder/'latest.json')
 def resync_maintenance(c,code):
     columns={r[1] for r in c.execute('PRAGMA table_info(vehicles)')}
@@ -187,6 +194,10 @@ def apply_one(c,op,root):
             frozen=op['frozen']
             if frozen.get('record')!=r:raise ValueError('Le contenu signé ne correspond pas au contrat envoyé.')
             if clean(dict(client),CLIENT_FIELDS)!=clean(frozen['client'],CLIENT_FIELDS):raise ValueError('Identité du client modifiée : refaire le contrat et sa signature.')
+            if r.get('second_code'):
+                if r['second_code']==r['client_code']:raise ValueError('Le deuxième conducteur doit être différent.')
+                second=c.execute('SELECT * FROM clients WHERE code=?',(r['second_code'],)).fetchone()
+                if not second or clean(dict(second),CLIENT_FIELDS)!=clean(frozen.get('second_client') or {},CLIENT_FIELDS):raise ValueError('Identité du deuxième conducteur modifiée : refaire le contrat.')
             start=date(r['date_depart'],r['heure_depart']);end=date(r['date_retour'],r['heure_retour'])
             if end<=start:raise ValueError('Retour antérieur au départ.')
             vehicle=available(c,r['vehicle_code'],start,end,r.get('reservation_ref',''),r['numero'] if existing else '')
@@ -195,9 +206,11 @@ def apply_one(c,op,root):
             if int(r['duree'])!=days or abs(money(r['montant'])-total)>.005 or paid>total or abs(money(r['reste'])-(total-paid))>.005:raise ValueError('Calcul du contrat invalide.')
             if not existing and int(r['km_depart'])<int(vehicle.get('compteur') or 0):raise ValueError('Kilométrage de départ inférieur au compteur PC.')
             cols=('numero','client_code','second_code','vehicle_code','date_depart','heure_depart','date_retour','heure_retour','duree','prix','montant','reglement','reste','km_depart','km_retour','created_at')
-            values={**r,'second_code':'','km_retour':0,'created_at':now}
+            values={**r,'second_code':r.get('second_code',''),'km_retour':0,'created_at':now}
             if not existing:c.execute('INSERT INTO contracts('+','.join(cols)+') VALUES('+','.join('?' for _ in cols)+')',[values[k] for k in cols])
-            c.execute('INSERT OR REPLACE INTO module_records(module,record_id,payload,created_at) VALUES(?,?,?,?)',('client_rapide_contract',r['numero'],json.dumps({'ref_notes':r.get('notes','')},ensure_ascii=False),now))
+            c.execute('INSERT OR REPLACE INTO module_records(module,record_id,payload,created_at) VALUES(?,?,?,?)',('client_rapide_contract',r['numero'],json.dumps({'ref_notes':r.get('notes',''),'mobile_details':{k:r.get(k) for k in ('departure_location','return_location','payment_mode','fuel_level','condition')}},ensure_ascii=False),now))
+            if isinstance(r.get('condition'),dict):
+                c.execute('INSERT OR REPLACE INTO module_records(module,record_id,payload,created_at) VALUES(?,?,?,?)',('contract_vehicle_condition',r['numero'],json.dumps(r['condition'],ensure_ascii=False),now))
             reservation_ref=r.get('reservation_ref')
             if reservation_ref and not existing:
                 row=c.execute("SELECT payload FROM module_records WHERE module='reservations' AND record_id=?",(reservation_ref,)).fetchone()

@@ -31,6 +31,9 @@ class Document:
             try:
                 d=datetime.strptime(c.get(key,''),'%d/%m/%Y');today=datetime.now();fields[target]=str(today.year-d.year-((today.month,today.day)<(d.month,d.day)))
             except ValueError:fields[target]=''
+        second=frozen.get('second_client') or {}
+        for target,key in [('second_code','code'),('second_last','nom'),('second_first','prenom'),('second_cin','cin'),('second_birth_date','date_naissance'),('second_phone','telephone'),('second_license','permis'),('second_license_date','date_permis')]:fields[target]=second.get(key,'')
+        fields['fuel_level']=r.get('fuel_level','½')
         self.vars={k:Value(str(x if x is not None else '')) for k,x in fields.items()}
         self.conn=sqlite3.connect(':memory:');self.conn.row_factory=sqlite3.Row
         keys=[k for k in v if re.fullmatch('[A-Za-z_][A-Za-z0-9_]*',k) and not isinstance(v[k],(dict,list))]
@@ -39,8 +42,8 @@ class Document:
         self.conn.execute('CREATE TABLE contracts(numero,return_status)');self.conn.execute('INSERT INTO contracts VALUES(?,?)',(r['numero'],'En cours'))
         self.conn.execute('CREATE TABLE contract_vehicle_states(contract_no,payload)')
         self.conn.execute('CREATE TABLE module_records(module,record_id,payload)')
-        self.conn.execute('INSERT INTO module_records VALUES(?,?,?)',('client_rapide_contract',r['numero'],json.dumps({'ref_notes':r.get('notes','')})))
-        self.conn.execute('INSERT INTO module_records VALUES(?,?,?)',('contract_vehicle_condition',r['numero'],json.dumps(v.get('condition',{}))))
+        self.conn.execute('INSERT INTO module_records VALUES(?,?,?)',('client_rapide_contract',r['numero'],json.dumps({'ref_notes':'\n'.join(filter(None,[r.get('notes',''),'Départ : '+r['departure_location'] if r.get('departure_location') else '', 'Retour : '+r['return_location'] if r.get('return_location') else '', 'Paiement : '+r['payment_mode'] if r.get('payment_mode') else '']))})))
+        self.conn.execute('INSERT INTO module_records VALUES(?,?,?)',('contract_vehicle_condition',r['numero'],json.dumps(r.get('condition',v.get('condition',{})))))
     def _get_setting(self,key,fallback=''):return self.settings.get(key,fallback)
     def _resolve_vehicle_photo_path(self,stored,code):
         return self.photo_uri

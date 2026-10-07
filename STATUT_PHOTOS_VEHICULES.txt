@@ -1,0 +1,7 @@
+ANDROID 2.9.3 — STATUT SUR LES PHOTOS
+
+Chaque photo de la liste Véhicules porte un badge : Disponible (vert), Loué (rouge), Réservé (orange). Même badge sur la fiche véhicule.
+Le statut est calculé sur la journée à partir des contrats et réservations connus, avec priorité aux locations. Les contrats retournés et réservations annulées sont exclus. Les retards confirmés restent loués.
+Les véhicules hors service restent masqués dans cette liste. La fraîcheur du statut dépend de la dernière synchronisation PC et des opérations locales.
+
+Remplacez les fichiers du dépôt GitHub par le contenu de ce dossier puis redéployez sur Railway. Les corrections de connexion des versions précédentes sont conservées.

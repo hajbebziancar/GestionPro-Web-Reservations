@@ -1,0 +1,12 @@
+Version 2.9.4 — formulaires Android HBZ
+
+Fiche client : saisie par onglets, âge et ancienneté calculés, documents PDF et historique existants conservés.
+Fiche véhicule : informations, entretien et alertes, photo et historique. Le compteur reste modifiable sur Android ; les autres caractéristiques se modifient sur le PC.
+Contrat : cinq étapes, deuxième conducteur optionnel, lieux de départ/retour, mode de paiement, carburant, état et équipements. Les champs sont conservés dans la base PC et resynchronisés.
+Connexion : conversion base64 en blocs, déchiffrement initial unique et prévention des doubles clics.
+
+Il ne s’agit pas d’un APK natif : l’application Android existante reste une application Web installable. Les maquettes sont adaptées aux fonctions disponibles. L’import de photos de dégâts, la signature agence et la remise en pourcentage ne sont pas ajoutés dans cette version. Les suppressions de fiches liées à un contrat restent gérées sur PC.
+
+Installer le ZIP complet côté serveur et mettre à jour le module PC ensemble. Ouvrir avec HTTPS, relancer après mise à jour pour charger la version 2.9.4. Ne pas effacer les données du téléphone : conserver les sauvegardes avant tout changement.
+
+Validation : tests JavaScript du domaine et tests de synchronisation des nouveaux champs. Deux tests PDF signé ne peuvent pas être validés dans cet environnement car Flask est absent. Le rendu sur un téléphone Android doit encore être vérifié.

@@ -11,6 +11,14 @@ function quote(start,end,price,paid,st='09:00',et='09:00'){let a=parseDate(start
 function closed(status){return /ANNUL|TERMIN|CONVERT|SUPPR|RETOUR CONFIRM|ANTICIP/.test(String(status||'').toUpperCase())}
 function vehicleCode(r){return String(r.vehicle||r.vehicle_code||'').split('|')[0].trim()}
 function availability(data,code,start,end,st='09:00',et='09:00',ignore=''){let a=parseDate(start,st),b=parseDate(end,et);if(b<=a)throw Error('Dates invalides.');for(const r of data.contracts||[]){if(r.numero===ignore||r.vehicle_code!==code||closed(r.return_status))continue;const ra=parseDate(r.date_depart,r.heure_depart||'00:00');const rb=/RETARD CONFIRM/.test(r.return_status||'')?new Date(8640000000000000):parseDate(r.actual_return_date||r.date_retour,r.actual_return_time||r.heure_retour||'23:59');if(a<rb&&b>ra)throw Error('Véhicule occupé : '+r.numero)}for(const r of data.reservations||[]){if(r.reference===ignore||vehicleCode(r)!==code||closed(r.status))continue;const ra=parseDate(r.start_date,r.start_time||'00:00'),rb=parseDate(r.end_date,r.end_time||'23:59');if(a<rb&&b>ra)throw Error('Véhicule réservé : '+r.reference)}}
+function vehicleStatus(data,vehicle,today=isoToday()){
+ if(Number(vehicle.service)!==1)return {label:'Hors service',tone:'offline'};
+ const rented=(data.contracts||[]).some(r=>r.vehicle_code===vehicle.code&&!closed(r.return_status)&&iso(r.date_depart)<=today&&(iso(r.actual_return_date||r.date_retour)>=today||/RETARD CONFIRM/.test(r.return_status||'')));
+ if(rented)return {label:'Loué',tone:'rented'};
+ const reserved=(data.reservations||[]).some(r=>vehicleCode(r)===vehicle.code&&!closed(r.status)&&iso(r.start_date)<=today&&iso(r.end_date)>=today);
+ if(reserved)return {label:'Réservé',tone:'reserved'};
+ return {label:'Disponible',tone:'available'};
+}
 function periodMatch(value,month){return !month||iso(value).startsWith(month)}
 function finance(data,month=''){let contracts=(data.contracts||[]).filter(r=>!closed(r.return_status)&&periodMatch(r.date_depart,month)); // Returned contracts still count in finance.
 contracts=(data.contracts||[]).filter(r=>!/ANNUL/.test(r.return_status||'')&&periodMatch(r.date_depart,month));
@@ -23,5 +31,5 @@ function cleanClient(r){return Object.fromEntries(CLIENT_FIELDS.map(k=>[k,r[k]??
 function openDB(){return new Promise((res,rej)=>{let r=indexedDB.open('gestionpro-mobile-v1',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
 async function get(key){const db=await openDB();return new Promise((res,rej)=>{const tx=db.transaction('kv','readonly'),r=tx.objectStore('kv').get(key);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);tx.oncomplete=()=>db.close()})}
 async function set(key,value){const db=await openDB();return new Promise((res,rej)=>{const tx=db.transaction('kv','readwrite');tx.objectStore('kv').put(value,key);tx.oncomplete=()=>{db.close();res()};tx.onerror=()=>{db.close();rej(tx.error)}})}
-const api={CLIENT_FIELDS,isoToday,parseDate,iso,french,num,round,quote,closed,vehicleCode,availability,finance,uid,cleanClient,get,set};global.GP=api;if(typeof module!=='undefined')module.exports=api;
+const api={CLIENT_FIELDS,vehicleStatus,isoToday,parseDate,iso,french,num,round,quote,closed,vehicleCode,availability,finance,uid,cleanClient,get,set};global.GP=api;if(typeof module!=='undefined')module.exports=api;
 })(typeof window==='undefined'?globalThis:window);
