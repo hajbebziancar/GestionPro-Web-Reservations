@@ -2,5 +2,3 @@
 
 /* Encarts société dans le thème GestionPro existant. */
 .company-ad{padding:24px;display:flex;flex-direction:column}.company-ad h3{color:var(--navy);margin:12px 0 8px;font-size:21px}.company-ad p{color:var(--muted);margin:0 0 12px}.company-ad .vehicle-select{margin-top:auto}
-
-.delete-cancelled-form{margin-top:8px}.delete-cancelled-button{background:#dc2638!important;color:#fff!important;border:1px solid #dc2638!important}.delete-cancelled-button:hover{background:#b91c2d!important}.delete-cancelled-button:focus-visible{outline:3px solid #f5a5ad;outline-offset:2px}

@@ -122,7 +122,7 @@ def render_contract_model1(app):
     from .contract_support import contract_state,EQUIPMENT
     recorded=contract_state(app.conn,values.get('contract_no',''))
     if 'equipment' in recorded:vehicle_state['equipment']=recorded['equipment']
-    equipment=tuple(recorded.get("equipment",{})) or EQUIPMENT
+    equipment=EQUIPMENT
     checked_equipment = vehicle_state.get("equipment", {})
     equipment_default = "equipment" not in vehicle_state
     checks = "".join(
@@ -305,7 +305,7 @@ body{{width:202mm;height:289mm;margin:auto;color:#24343a;font:8.3px/1.2 'Segoe U
 <div class="signatures">
 <section class="box">{heading('Signature client','pen')}<div class="signature-body signature-identity">{client_signature}</div></section>
 <section class="box">{heading('Signature 2e conducteur','pen')}<div class="signature-body signature-identity">{second_signature}</div></section>
-<section class="box">{heading('Cachet et signature agence','file')}<div class="signature-body signature-agency">{("<img src=\""+html.escape(app.agency_signature)+"\" alt=\"Signature agence\" style=\"max-width:100%;max-height:22mm\">") if getattr(app,"agency_signature","") else stamp}</div></section></div>
+<section class="box">{heading('Cachet et signature agence','file')}<div class="signature-body signature-agency">{stamp}</div></section></div>
 <footer class="footer"><span>{setting('company_name','HBZ RENT CAR')} · {setting('company_phone','0661247113')} · {setting('company_email','hajbenziancar@gmail.com')}</span>
 <span>{setting('company_address','')}</span><strong>{html.escape(status)}</strong></footer>
 </div></body></html>"""

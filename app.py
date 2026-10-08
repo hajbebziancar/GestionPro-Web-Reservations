@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash, abort, send_from_directory, send_file
+from flask import Flask, render_template, request, redirect, url_for, session, flash, abort, send_from_directory
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from functools import wraps
@@ -6,9 +6,6 @@ from pathlib import Path
 from datetime import datetime, date, timedelta
 import sqlite3, secrets, os, re, uuid, time
 from security_limits import AttemptLimiter
-from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
-from urllib.parse import urlencode
-from reservation_receipt import create_receipt
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = Path(os.environ['GESTIONPRO_DATA_DIR']).expanduser().resolve() if os.environ.get('GESTIONPRO_DATA_DIR') else None
@@ -167,9 +164,6 @@ def to_date(s):
     raise ValueError('date invalide')
 
 def reservation_overlap(c, vehicle_code, start_date, end_date, ignore_reservation_id=None):
-    # Disponibilité publique par jour : le jour de retour est libre.
-    # Une demande sur une seule journée reste contrôlée sur cette journée.
-    requested_end = max(end_date, start_date + timedelta(days=1))
     sql = '''SELECT id,code_reservation,date_depart,date_retour,statut FROM reservations
              WHERE code_vehicule=? AND COALESCE(statut,'EN ATTENTE') NOT IN ('ANNULEE','ANNULÉE','ANNULÉ','ANNULE','TERMINEE','TERMINÉ','TERMINE')'''
     params = [vehicle_code]
@@ -179,7 +173,7 @@ def reservation_overlap(c, vehicle_code, start_date, end_date, ignore_reservatio
     for r in rows:
         try:
             a,b = to_date(r['date_depart']), to_date(r['date_retour'])
-            if b > a and start_date < b and requested_end > a:
+            if start_date <= b and end_date >= a:
                 return True
         except Exception:
             continue
@@ -187,7 +181,7 @@ def reservation_overlap(c, vehicle_code, start_date, end_date, ignore_reservatio
     for r in rows:
         try:
             a,b = to_date(r['date_depart']), to_date(r['date_retour'])
-            if b > a and start_date < b and requested_end > a:
+            if start_date <= b and end_date >= a:
                 return True
         except Exception:
             continue
@@ -290,7 +284,7 @@ def reserve():
             date_depart,heure_depart,date_retour,heure_retour,duree,prix,montant,avance,reste,statut,observation,date_creation)
             VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)''',
             (code,code_client,cin,nom,prenom,tel,v['code_vehicule'],v['marque'],v['immatriculation'],dep,hdep,ret,hret,duree,prix,montant,0,montant,'EN ATTENTE', '[WEB] '+observation))
-    return render_template('success.html', code=code, nom=nom, montant=montant, receipt_url=url_for('public_receipt', token=receipt_token(code)))
+    return render_template('success.html', code=code, nom=nom, montant=montant)
 
 @app.route('/admin/setup', methods=['GET','POST'])
 def admin_setup():
@@ -376,21 +370,6 @@ def change_status(rid):
     audit('RESERVATION_STATUS', f"{r['code_reservation']} -> {new}")
     flash('Statut mis à jour.', 'success')
     return redirect(request.referrer or url_for('admin_dashboard'))
-
-@app.route('/admin/reservation/<int:rid>/delete', methods=['POST'])
-@login_required
-def delete_cancelled_reservation(rid):
-    with db() as c:
-        r = c.execute('SELECT code_reservation,statut FROM reservations WHERE id=?', (rid,)).fetchone()
-        if not r:
-            abort(404)
-        deleted = c.execute("DELETE FROM reservations WHERE id=? AND UPPER(REPLACE(REPLACE(TRIM(COALESCE(statut,'')),'é','e'),'É','E')) IN ('ANNULEE','ANNULE')", (rid,))
-        if deleted.rowcount != 1:
-            abort(409, description='Seules les réservations annulées peuvent être supprimées.')
-        c.execute('INSERT INTO web_audit(username,action,details,ip) VALUES(?,?,?,?)',
-                  (session.get('web_user'), 'RESERVATION_DELETE', r['code_reservation'], request.remote_addr))
-    flash('Réservation annulée supprimée.', 'success')
-    return redirect(url_for('admin_dashboard', statut=request.form.get('statut',''), q=request.form.get('q','')))
 
 @app.route('/admin/parc')
 @login_required
@@ -617,63 +596,6 @@ from werkzeug.middleware.dispatcher import DispatcherMiddleware
 from mobile_mount import MobileMount
 app.wsgi_app = DispatcherMiddleware(app.wsgi_app, {'/mobile': MobileMount()})
 
-
-
-# Signed receipt links expire after seven days; admin can generate a fresh link.
-def receipt_token(code):
-    return URLSafeTimedSerializer(app.secret_key, salt='reservation-receipt-v1').dumps(code)
-
-
-def receipt_response(row):
-    response = send_file(create_receipt(row), mimetype='application/pdf', as_attachment=True,
-                         download_name='Recu_reservation_' + secure_filename(row['code_reservation']) + '.pdf')
-    response.headers['Cache-Control'] = 'private, no-store'
-    response.headers['X-Robots-Tag'] = 'noindex, nofollow'
-    return response
-
-
-@app.get('/reservation/recu/<token>.pdf')
-def public_receipt(token):
-    try:
-        code = URLSafeTimedSerializer(app.secret_key, salt='reservation-receipt-v1').loads(token, max_age=7*24*3600)
-    except SignatureExpired:
-        abort(410, 'Le lien du reçu a expiré. Contactez l’agence.')
-    except BadSignature:
-        abort(404)
-    with db() as c:
-        row = c.execute('SELECT * FROM reservations WHERE code_reservation=?', (code,)).fetchone()
-    if row is None:
-        abort(404)
-    return receipt_response(row)
-
-
-@app.get('/admin/reservation/<int:rid>/recu.pdf')
-@login_required
-def admin_receipt(rid):
-    with db() as c:
-        row = c.execute('SELECT * FROM reservations WHERE id=?', (rid,)).fetchone()
-    if row is None:
-        abort(404)
-    return receipt_response(row)
-
-
-@app.get('/admin/reservation/<int:rid>/envoyer-recu')
-@login_required
-def share_receipt(rid):
-    with db() as c:
-        row = c.execute('SELECT * FROM reservations WHERE id=?', (rid,)).fetchone()
-    if row is None:
-        abort(404)
-    link = url_for('public_receipt', token=receipt_token(row['code_reservation']), _external=True)
-    phone = re.sub(r'\D', '', row['telephone'] or '')
-    if phone.startswith('00'):
-        phone = phone[2:]
-    elif phone.startswith('0') and len(phone) == 10:
-        phone = '212' + phone[1:]
-    message = 'Bonjour, voici votre reçu de réservation HBZ RENT CAR ' + row['code_reservation'] + ' : ' + link + ' (lien valable 7 jours).'
-    whatsapp = 'https://wa.me/' + phone + '?' + urlencode({'text': message})
-    return render_template('share_receipt.html', reservation=row, receipt_url=link, whatsapp_url=whatsapp)
-
 if __name__ == '__main__':
     print('\nGestionPro Web - HBZ Rent Car')
     print('Site public : http://127.0.0.1:5000')
@@ -681,4 +603,3 @@ if __name__ == '__main__':
     print('Gestion du parc : http://127.0.0.1:5000/admin/parc')
     print('Premier lancement : créez le compte administrateur dans /admin/setup\n')
     app.run(host='127.0.0.1', port=5000, debug=False)
-

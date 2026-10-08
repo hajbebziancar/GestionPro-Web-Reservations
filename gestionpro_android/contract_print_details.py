@@ -32,8 +32,6 @@ def add_print_observations(content,conn,number):
             picture=re.sub(r'src=[\"\'][^\"\']*[\"\']',lambda _: 'src="'+html.escape(drawing.resolve().as_uri())+'"',match.group(0))
             if 'alt=' not in picture:picture=picture.replace('<img','<img alt="État du véhicule annoté"',1)
             content=content[:match.start()]+picture+content[match.end():]
-    if str(state.get('drawing_data','')).startswith('data:image/png;base64,'):
-        content=re.sub(pattern,lambda m:re.sub(r'src=[\"\'][^\"\']*[\"\']',lambda _: 'src=\"'+html.escape(state['drawing_data'],quote=True)+'\"',m[0]),content,flags=re.IGNORECASE)
     parts=[str(state.get('observations','') or '').strip(),str(contract_details(conn,number).get('ref_notes','') or '').strip()]
     notes='\n'.join(dict.fromkeys(part for part in parts if part))
     if not notes:return content
