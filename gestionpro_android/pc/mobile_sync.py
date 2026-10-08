@@ -198,8 +198,10 @@ def apply_one(c,op,root):
             km=int(r['compteur']);current=int(old['compteur'] or 0)
             original=op.get('original',{}).get('compteur')
             if original is None:raise ValueError('Compteur initial absent. Réactualisez le véhicule.')
-            if km<int(original):raise ValueError('Le compteur ne peut pas diminuer.')
-            if km<current:raise ValueError('Le compteur PC est déjà supérieur ('+str(current)+' km). Réactualisez le véhicule.')
+            if km<0:raise ValueError('Compteur négatif interdit.')
+            if r.get('hbz_counter_correction') and current!=int(original):raise ValueError('Compteur modifié sur le PC : synchronisez avant correction.')
+            if not r.get('hbz_counter_correction') and km<int(original):raise ValueError('Le compteur ne peut pas diminuer.')
+            if not r.get('hbz_counter_correction') and km<current:raise ValueError('Le compteur PC est déjà supérieur ('+str(current)+' km). Réactualisez le véhicule.')
             # An independent price/photo/service edit must not reject a newer odometer.
             c.execute('UPDATE vehicles SET compteur=? WHERE code=?',(km,r['code']))
             if r.get('hbz_full_edit'):
@@ -211,6 +213,17 @@ def apply_one(c,op,root):
                 c.execute('UPDATE vehicles SET modele=?,immatriculation=?,chassis=?,prix=?,service=? WHERE code=?',[r[k] for k in ('modele','immatriculation','chassis','prix','service','code')])
                 c.execute('INSERT OR REPLACE INTO module_records(module,record_id,payload,created_at) VALUES(?,?,?,?)',('mobile_vehicle_profile',r['code'],json.dumps(r.get('hbz_profile',{}),ensure_ascii=False),now))
             resync_maintenance(c,r['code'])
+        elif kind=='contract_extend':
+            row=c.execute('SELECT * FROM contracts WHERE numero=?',(r['numero'],)).fetchone()
+            if not row:raise ValueError('Contrat absent.')
+            old=dict(row)
+            if any(str(old[k])!=str(op['original'].get(k)) for k in ('date_retour','heure_retour','duree','montant')):raise ValueError('Contrat modifié : synchronisez avant prolongation.')
+            a=date(old['date_depart'],old['heure_depart']);b=date(r['date_retour'],r['heure_retour'])
+            if b<=a:raise ValueError('Retour antérieur au départ.')
+            days=max(1,(b.date()-a.date()).days);total=round(days*money(old['prix']),2);paid=money(old['reglement'])
+            if paid>total:raise ValueError('Durée incompatible avec le règlement enregistré.')
+            c.execute('UPDATE contracts SET date_retour=?,heure_retour=?,duree=?,montant=?,reste=? WHERE numero=?',(r['date_retour'],r['heure_retour'],days,total,round(total-paid,2),r['numero']))
+            c.execute('INSERT OR REPLACE INTO module_records(module,record_id,payload,created_at) VALUES(?,?,?,?)',('contract_extension',op['id'],json.dumps({'numero':r['numero'],'before':old,'after':r,'signature_preserved':True},ensure_ascii=False),now))
         elif kind=='contract_create':
             existing=c.execute('SELECT * FROM contracts WHERE numero=?',(r['numero'],)).fetchone()
             pending=c.execute("SELECT payload FROM module_records WHERE module='mobile_contract_draft' AND record_id=?",(r['numero'],)).fetchone()
@@ -234,6 +247,13 @@ def apply_one(c,op,root):
             raw_vehicle=c.execute('SELECT * FROM vehicles WHERE code=? AND service=1',(r['vehicle_code'],)).fetchone()
             if not raw_vehicle:raise ValueError('Véhicule absent ou hors service.')
             vehicle=dict(raw_vehicle)
+            if 'vehicle_counter' in r:
+                counter=r['vehicle_counter']
+                if isinstance(counter,bool) or not isinstance(counter,int) or counter<0:raise ValueError('Compteur actuel invalide.')
+                if counter!=int(vehicle.get('compteur') or 0):
+                    if int(vehicle.get('compteur') or 0)!=r.get('vehicle_counter_original'):raise ValueError('Compteur modifié sur le PC : synchronisez avant correction.')
+                    c.execute('UPDATE vehicles SET compteur=? WHERE code=?',(counter,r['vehicle_code']))
+                    resync_maintenance(c,r['vehicle_code'])
             if any(str(vehicle.get(k,''))!=str(frozen['vehicle'].get(k,'')) for k in ('code','modele','immatriculation','chassis')):raise ValueError('Identité du véhicule modifiée : refaire le contrat et sa signature.')
             days=max(1,(end.date()-start.date()).days);price=money(r['prix']);paid=money(r['reglement']);total=round(days*price,2)
             if 'discount_percent' in r:

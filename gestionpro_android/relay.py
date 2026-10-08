@@ -45,7 +45,7 @@ class Relay:
             if op['status']!='pending':continue
             if op['kind'] in ('client_create','client_update'):
                 key='clients';identity='code';record=op['record']
-            elif op['kind']=='contract_create':
+            elif op['kind'] in ('contract_create','contract_extend'):
                 key='contracts';identity='numero';record={**op['record'],'signature':op.get('signature',''),'frozen':op.get('frozen'), 'pdf':op.get('pdf','')}
             elif op['kind'] in ('vehicle_update','vehicle_create'):
                 key='vehicles';identity='code';record=op['record']
@@ -65,7 +65,7 @@ class Relay:
         snapshot['operations']=ops
         return snapshot
     def validate(self,op):
-        if not isinstance(op,dict) or op.get('kind') not in ('client_create','client_update','contract_create','reservation_create','reservation_update','maintenance_create','maintenance_update','vehicle_update','vehicle_create','document_upload'):raise ValueError('Opération inconnue.')
+        if not isinstance(op,dict) or op.get('kind') not in ('client_create','client_update','contract_create','contract_extend','reservation_create','reservation_update','maintenance_create','maintenance_update','vehicle_update','vehicle_create','document_upload'):raise ValueError('Opération inconnue.')
         if not isinstance(op.get('id'),str) or not 8<=len(op['id'])<=80:raise ValueError('Identifiant invalide.')
         if op.get('trusted_web'):raise ValueError('Réservation web importée uniquement par le serveur.')
         r=op.get('record')
@@ -82,7 +82,8 @@ class Relay:
             if op['kind'].endswith('_update') and not isinstance(op.get('original'),dict):raise ValueError('Version d’origine absente.')
         else:
             if not all(r.get(k) for k in ('numero','client_code','vehicle_code','date_depart','date_retour')):raise ValueError('Contrat incomplet.')
-            if not isinstance(op.get('frozen'),dict):raise ValueError('Copie figée absente.')
+            if op['kind']=='contract_create' and not isinstance(op.get('frozen'),dict):raise ValueError('Copie figée absente.')
+            if op['kind']=='contract_extend' and not isinstance(op.get('original'),dict):raise ValueError('Version initiale absente.')
         if len(json.dumps(op))>6_000_000:raise ValueError('Document trop volumineux.')
         if op.get('signature'):
             signature=op['signature']

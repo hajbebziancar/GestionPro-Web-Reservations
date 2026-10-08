@@ -1,0 +1,1 @@
+Android 2.9.13 : ajuster date et heure de retour depuis un contrat ; durée, total et reste recalculés. Signature et PDF d’origine conservés. PDF durée actualisée généré avec signature initiale et mention de prolongation. Mise à jour du synchroniseur PC nécessaire.

@@ -66,6 +66,17 @@ class SyncTests(unittest.TestCase):
         self.assertEqual(len(result['vehicles']),1)
         archives=list((self.root/'contrats_signes').glob('*/latest.json'));self.assertEqual(len(archives),1)
         self.assertTrue(list((self.root/'contrats_signes').glob('*/*.pdf')))
+    def test_contract_counter_correction_preserves_contract(self):
+        self.call('/mobile/api/sync',{'operations':[self.customer(),self.contract(False)]});self.sync()
+        with db(self.path) as c:
+            before=dict(c.execute('SELECT * FROM contracts').fetchone())
+            v=clean(dict(c.execute('SELECT * FROM vehicles WHERE code="V1"').fetchone()),VEHICLE_FIELDS)
+        op={'id':'op-correction','kind':'vehicle_update','record':{**v,'compteur':9500,'hbz_counter_correction':True},'original':v}
+        self.call('/mobile/api/sync',{'operations':[op]});self.sync()
+        with db(self.path) as c:
+            self.assertEqual(c.execute('SELECT compteur FROM vehicles WHERE code="V1"').fetchone()[0],9500)
+            self.assertEqual(dict(c.execute('SELECT * FROM contracts').fetchone()),before)
+
     def test_conflict_counter_does_not_overwrite_pc(self):
         with db(self.path) as c:v=clean(dict(c.execute('SELECT * FROM vehicles WHERE code="V1"').fetchone()),VEHICLE_FIELDS)
         op={'id':'op-counter-001','kind':'vehicle_update','record':{**v,'compteur':11000},'original':v}

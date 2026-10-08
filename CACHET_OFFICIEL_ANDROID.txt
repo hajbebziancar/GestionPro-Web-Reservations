@@ -1,0 +1,1 @@
+Android 2.9.11 : reprend CACHET_SIGNATURE.png utilisé par le modèle de contrat PC fourni. Affichage dans le formulaire Android et dans le PDF, y compris si une signature agence a été tracée. Cachet disponible hors connexion après chargement de la nouvelle version.

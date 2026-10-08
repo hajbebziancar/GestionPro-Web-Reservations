@@ -1,0 +1,3 @@
+Version Android 2.9.14
+Compteur actuel modifiable depuis un nouveau contrat et bouton Modifier le compteur actuel dans un contrat existant. Durée, signature et PDF signé original conservés. Synchroniser le PC et le téléphone après mise à jour.
+Railway : remplacer ensemble app.py, reservation_receipt.py, requirements.txt et les templates du ZIP à la racine du dépôt. La route admin_receipt est présente et vérifiée.

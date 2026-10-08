@@ -1,0 +1,1 @@
+Android 2.9.12 : bouton Annuler la réservation avec confirmation. Contrat : suppression comparaison kilométrage/compteur et suppression contrôle de chevauchement de disponibilité, Android et synchronisation PC. Kilométrage entier non négatif, dates valides et véhicule en service restent requis.
