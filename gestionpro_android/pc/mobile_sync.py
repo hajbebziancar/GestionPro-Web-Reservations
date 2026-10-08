@@ -231,14 +231,16 @@ def apply_one(c,op,root):
                 if not second or clean(dict(second),CLIENT_FIELDS)!=clean(frozen.get('second_client') or {},CLIENT_FIELDS):raise ValueError('Identité du deuxième conducteur modifiée : refaire le contrat.')
             start=date(r['date_depart'],r['heure_depart']);end=date(r['date_retour'],r['heure_retour'])
             if end<=start:raise ValueError('Retour antérieur au départ.')
-            vehicle=available(c,r['vehicle_code'],start,end,r.get('reservation_ref',''),r['numero'] if existing else '')
+            raw_vehicle=c.execute('SELECT * FROM vehicles WHERE code=? AND service=1',(r['vehicle_code'],)).fetchone()
+            if not raw_vehicle:raise ValueError('Véhicule absent ou hors service.')
+            vehicle=dict(raw_vehicle)
             if any(str(vehicle.get(k,''))!=str(frozen['vehicle'].get(k,'')) for k in ('code','modele','immatriculation','chassis')):raise ValueError('Identité du véhicule modifiée : refaire le contrat et sa signature.')
             days=max(1,(end.date()-start.date()).days);price=money(r['prix']);paid=money(r['reglement']);total=round(days*price,2)
             if 'discount_percent' in r:
                 discount=float(r['discount_percent']);base=money(r['base_price'])
                 if not math.isfinite(discount) or not 0<=discount<=100 or abs(price-round(base*(1-discount/100),2))>.005:raise ValueError('Remise du contrat invalide.')
             if int(r['duree'])!=days or abs(money(r['montant'])-total)>.005 or paid>total or abs(money(r['reste'])-(total-paid))>.005:raise ValueError('Calcul du contrat invalide.')
-            if not existing and int(r['km_depart'])<int(vehicle.get('compteur') or 0):raise ValueError('Kilométrage de départ inférieur au compteur PC.')
+            if int(r['km_depart'])<0:raise ValueError('Kilométrage négatif.')
             cols=('numero','client_code','second_code','vehicle_code','date_depart','heure_depart','date_retour','heure_retour','duree','prix','montant','reglement','reste','km_depart','km_retour','created_at')
             values={**r,'second_code':r.get('second_code',''),'km_retour':0,'created_at':now}
             if not existing:c.execute('INSERT INTO contracts('+','.join(cols)+') VALUES('+','.join('?' for _ in cols)+')',[values[k] for k in cols])
@@ -258,6 +260,13 @@ def apply_one(c,op,root):
                 c.execute("DELETE FROM module_records WHERE module='mobile_contract_draft' AND record_id=?",(r['numero'],))
             else:
                 c.execute('INSERT INTO module_records VALUES(?,?,?,?)',('mobile_contract_draft',r['numero'],json.dumps({'op_id':op['id'],'record':r,'status':'SIGNATURE ATTENDUE'},ensure_ascii=False),now))
+        elif kind=='reservation_update' and r.get('status')=='ANNULÉ':
+            prior=c.execute("SELECT payload FROM module_records WHERE module='reservations' AND record_id=?",(r['reference'],)).fetchone()
+            if not prior or json.loads(prior[0])!=op.get('original'):raise ValueError('Réservation modifiée : synchronisez avant annulation.')
+            current=json.loads(prior[0])
+            if current.get('contract_no') or any(x in str(current.get('status','')).upper() for x in ('TERMIN','CONVERT')):raise ValueError('Réservation déjà convertie en contrat.')
+            current['status']='ANNULÉ'
+            c.execute("UPDATE module_records SET payload=? WHERE module='reservations' AND record_id=?",(json.dumps(current,ensure_ascii=False),r['reference']))
         elif kind.startswith(('reservation_','maintenance_')):
             name='reservations' if kind.startswith('reservation') else 'maintenance';reference=r['reference']
             prior=c.execute('SELECT payload FROM module_records WHERE module=? AND record_id=?',(name,reference)).fetchone()

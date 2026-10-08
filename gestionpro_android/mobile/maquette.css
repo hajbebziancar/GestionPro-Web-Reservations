@@ -12,3 +12,5 @@
 .hz-contract-footer button:last-child .hbz-icon{transform:rotate(180deg);order:2}
 
 .hbz-exact .hz-client-actions .hz-client-reserve{grid-column:1 / -1;font-weight:700}
+
+.hbz-exact .hz-company-stamp{display:block;width:140px;max-width:100%;height:80px;object-fit:contain;margin:auto}

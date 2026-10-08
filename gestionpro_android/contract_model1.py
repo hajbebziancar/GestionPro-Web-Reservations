@@ -264,7 +264,8 @@ body{{width:202mm;height:289mm;margin:auto;color:#24343a;font:8.3px/1.2 'Segoe U
 .signature-identity{{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:.3mm;text-align:center}}
 .signature-label{{font:600 7px/1.2 'Segoe UI',Arial,sans-serif;color:#667576}}
 .signature-cin{{font:800 10px/1.2 'Segoe UI',Arial,sans-serif;color:#24343a;letter-spacing:.3px;overflow-wrap:anywhere}}
-.signature-agency{{display:flex;align-items:center;justify-content:center;padding:.2mm 1mm}}
+.signature-agency{{position:relative;display:flex;align-items:center;justify-content:center;padding:.2mm 1mm}}
+.signature-agency img[alt="Signature agence"]{{position:absolute;max-width:90%!important;max-height:18mm!important;z-index:1}}
 .signature-agency img{{display:block;max-height:18.4mm;max-width:46mm;width:auto;height:auto;margin:auto;object-fit:contain}}
 .signature-denied{{display:block;text-align:center;padding-top:5mm;color:#a9664c;font:700 8px/1.3 Georgia,serif}}
 .footer{{margin-top:auto;height:6mm;border-top:1px solid #bbc7c3;display:flex;align-items:center;justify-content:space-between;font-size:7px;color:#466164;white-space:nowrap}}
@@ -305,7 +306,7 @@ body{{width:202mm;height:289mm;margin:auto;color:#24343a;font:8.3px/1.2 'Segoe U
 <div class="signatures">
 <section class="box">{heading('Signature client','pen')}<div class="signature-body signature-identity">{client_signature}</div></section>
 <section class="box">{heading('Signature 2e conducteur','pen')}<div class="signature-body signature-identity">{second_signature}</div></section>
-<section class="box">{heading('Cachet et signature agence','file')}<div class="signature-body signature-agency">{("<img src=\""+html.escape(app.agency_signature)+"\" alt=\"Signature agence\" style=\"max-width:100%;max-height:22mm\">") if getattr(app,"agency_signature","") else stamp}</div></section></div>
+<section class="box">{heading('Cachet et signature agence','file')}<div class="signature-body signature-agency">{("<img src=\""+html.escape(app.agency_signature)+"\" alt=\"Signature agence\" style=\"max-width:100%;max-height:22mm\">") if getattr(app,"agency_signature","") else ""}{stamp}</div></section></div>
 <footer class="footer"><span>{setting('company_name','HBZ RENT CAR')} · {setting('company_phone','0661247113')} · {setting('company_email','hajbenziancar@gmail.com')}</span>
 <span>{setting('company_address','')}</span><strong>{html.escape(status)}</strong></footer>
 </div></body></html>"""
