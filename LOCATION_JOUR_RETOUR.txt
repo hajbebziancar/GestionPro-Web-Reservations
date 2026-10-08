@@ -1,0 +1,1 @@
+Android 2.9.9 et synchroniseur PC : une nouvelle location peut commencer dès le jour du retour, quelle que soit l’heure. Jour de retour exclu du contrôle des conflits. Retard confirmé reste bloquant. Mettre à jour aussi le synchroniseur PC avec INSTALLER_PC.

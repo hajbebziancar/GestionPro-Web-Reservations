@@ -1,0 +1,1 @@
+Android 2.9.10 : Établir un contrat depuis la liste et la fiche de réservation. Reprise du client, véhicule, dates, tarif et acompte. Synchroniser avant conversion ; fiche client existante obligatoire. Les réservations annulées, clôturées ou déjà liées à un contrat ne peuvent pas être converties à nouveau.

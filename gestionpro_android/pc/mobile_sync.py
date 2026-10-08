@@ -100,18 +100,21 @@ def snapshot(c):
 def available(c,code,start,end,ignore='',ignore_contract=''):
     vehicle=c.execute('SELECT * FROM vehicles WHERE code=?',(code,)).fetchone()
     if not vehicle or vehicle['service']!=1:raise ValueError('Véhicule absent ou hors service sur le PC.')
+    start=start.replace(hour=0,minute=0,second=0,microsecond=0)
+    end=end.replace(hour=0,minute=0,second=0,microsecond=0)
+    if end<=start:end=start+__import__('datetime').timedelta(days=1)
     for raw in c.execute('SELECT * FROM contracts WHERE vehicle_code=?',(code,)):
         r=dict(raw)
         if r['numero']==ignore_contract:continue
         status=str(r.get('return_status','')).upper()
         if any(x in status for x in ('RETOUR CONFIRM','ANTICIP','ANNUL')):continue
-        a=date(r['date_depart'],r.get('heure_depart') or '00:00')
-        b=datetime.max if 'RETARD CONFIRM' in status else date(r.get('actual_return_date') or r['date_retour'],r.get('actual_return_time') or r.get('heure_retour') or '23:59')
+        a=date(r['date_depart'],'00:00')
+        b=datetime.max if 'RETARD CONFIRM' in status else date(r.get('actual_return_date') or r['date_retour'],'00:00')
         if start<b and end>a:raise ValueError('Véhicule occupé : contrat '+r['numero'])
     for r in module(c,'reservations'):
         if r.get('reference')==ignore or str(r.get('vehicle','')).split('|')[0].strip()!=code:continue
         if any(x in str(r.get('status','')).upper() for x in ('ANNUL','TERMIN','CONVERT','SUPPR')):continue
-        a=date(r.get('start_date'),r.get('start_time') or '00:00');b=date(r.get('end_date'),r.get('end_time') or '23:59')
+        a=date(r.get('start_date'),'00:00');b=date(r.get('end_date'),'00:00')
         if start<b and end>a:raise ValueError('Véhicule réservé : '+str(r.get('reference','')))
     return dict(vehicle)
 def archive(c,op,root):
