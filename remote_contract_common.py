@@ -32,32 +32,7 @@ def insert_signature(content,payload):
     patterns=[r'(<div class="signature-body signature-identity">)(.*?)(</div>)',r"(<div class='sighead'>8&nbsp;&nbsp;Signature client</div><div class='sigbody'[^>]*>)(.*?)(</div>)",r"(<div class='signature'><b>♟ SIGNATURE CLIENT</b>)(.*?)(</div>)(?=<div class='signature'>)"]
     for pattern in patterns:
         out,n=re.subn(pattern,lambda m:m[1]+img+clean(m[2])+m[3],content,count=1,flags=re.S)
-        if n:return insert_verso_signature(out,img)
-    pattern=r"(<div class='signature'>Signature du locataire)(.*?)(</div>)"
-    out,n=re.subn(pattern,lambda m:m[1]+img+clean(m[2])+m[3],content,count=1,flags=re.S)
-    if n:return insert_verso_signature(out,img)
+        if n:return out
+    if "<div class='signature'>Signature du locataire" in content:
+        return content.replace("<div class='signature'>Signature du locataire","<div class='signature'>Signature du locataire"+img,1)
     raise ValueError('Cadre de signature du contrat non reconnu.')
-
-
-def ensure_verso(content):
-    """Use the same bilingual conditions sheet as the desktop application."""
-    if 'id="hbz-remote-verso"' in content:return content
-    picture=Path(__file__).resolve().parent/'assets'/'contract_verso_conditions.jpg'
-    if not picture.is_file():raise ValueError('Le verso des conditions générales est introuvable.')
-    uri='data:image/jpeg;base64,'+base64.b64encode(picture.read_bytes()).decode()
-    existing=re.search(r'<div class=[\"\']hbz-contract-verso[\"\']>\s*<img[^>]*src=([\"\'])(.*?)\1[^>]*>\s*</div>',content,re.S)
-    if existing:
-        uri=existing[2]
-        content=content[:existing.start()]+content[existing.end():]
-    css='<style id="hbz-remote-duplex">@page{size:A4;margin:4mm}html,body{height:auto!important;max-height:none!important;overflow:visible!important}#hbz-remote-verso{page-break-before:always;break-before:page;box-sizing:border-box;width:100%;height:280mm;display:block;position:relative;background:white;color:#17324d}#hbz-remote-verso>.hbz-conditions{display:block;width:100%;height:257mm;max-height:257mm;object-fit:contain}#hbz-remote-verso>.hbz-back-signature{height:20mm;box-sizing:border-box;border:1px solid #789;padding:2mm;font:11px Arial;break-inside:avoid}#hbz-remote-verso>.hbz-back-signature img{max-height:11mm!important}</style>'
-    verso='<section id="hbz-remote-verso"><img class="hbz-conditions" alt="Conditions générales du contrat, verso" src="'+uri+'"><div class="hbz-back-signature"><b>Signature du client — acceptation des conditions au recto et au verso</b><div id="hbz-verso-signature"></div></div></section>'
-    if not re.search(r'</body>',content,re.I):raise ValueError('Document de contrat incomplet.')
-    content=re.sub(r'</head>',lambda m:css+m[0],content,count=1,flags=re.I)
-    return re.sub(r'</body>',lambda m:verso+m[0],content,count=1,flags=re.I)
-
-
-def insert_verso_signature(content,img):
-    pattern=r'(<div id="hbz-verso-signature">)(.*?)(</div>)'
-    out,n=re.subn(pattern,lambda m:m[1]+img+m[3],content,count=1,flags=re.S)
-    if not n:raise ValueError('Le cadre de signature au verso est absent.')
-    return out
