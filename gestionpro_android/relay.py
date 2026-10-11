@@ -1,5 +1,5 @@
 """Relais autonome WSGI (stdlib). Montage sous /mobile/ sur le site existant."""
-import base64, hashlib, hmac, json, mimetypes, os, secrets, sqlite3, time
+import gzip, base64, hashlib, hmac, json, mimetypes, os, secrets, sqlite3, time
 from pathlib import Path
 from contextlib import contextmanager
 from wsgiref.simple_server import make_server, WSGIServer
@@ -45,7 +45,7 @@ class Relay:
             if op['status']!='pending':continue
             if op['kind'] in ('client_create','client_update'):
                 key='clients';identity='code';record=op['record']
-            elif op['kind'] in ('contract_create','contract_extend'):
+            elif op['kind'] in ('contract_create','contract_extend','contract_update','contract_cancel','contract_delete'):
                 key='contracts';identity='numero';record={**op['record'],'signature':op.get('signature',''),'frozen':op.get('frozen'), 'pdf':op.get('pdf','')}
             elif op['kind'] in ('vehicle_update','vehicle_create'):
                 key='vehicles';identity='code';record=op['record']
@@ -54,7 +54,7 @@ class Relay:
             elif op['kind'].startswith('maintenance_'):
                 key='maintenance';identity='reference';record=op['record']
             else:continue
-            snapshot[key]=[r for r in snapshot[key] if r[identity]!=record[identity]]+[record]
+            snapshot[key]=[r for r in snapshot[key] if r[identity]!=record[identity]]+([] if op['kind']=='contract_delete' else [record])
         from gestionpro_android.web_bookings import bookings
         web=bookings()
         existing={r['reference'] for r in snapshot['reservations']}
@@ -65,7 +65,7 @@ class Relay:
         snapshot['operations']=ops
         return snapshot
     def validate(self,op):
-        if not isinstance(op,dict) or op.get('kind') not in ('client_create','client_update','contract_create','contract_extend','reservation_create','reservation_update','maintenance_create','maintenance_update','vehicle_update','vehicle_create','document_upload'):raise ValueError('Opération inconnue.')
+        if not isinstance(op,dict) or op.get('kind') not in ('client_create','client_update','contract_create','contract_extend','contract_update','contract_cancel','contract_delete','reservation_create','reservation_update','maintenance_create','maintenance_update','vehicle_update','vehicle_create','document_upload'):raise ValueError('Opération inconnue.')
         if not isinstance(op.get('id'),str) or not 8<=len(op['id'])<=80:raise ValueError('Identifiant invalide.')
         if op.get('trusted_web'):raise ValueError('Réservation web importée uniquement par le serveur.')
         r=op.get('record')
@@ -83,7 +83,7 @@ class Relay:
         else:
             if not all(r.get(k) for k in ('numero','client_code','vehicle_code','date_depart','date_retour')):raise ValueError('Contrat incomplet.')
             if op['kind']=='contract_create' and not isinstance(op.get('frozen'),dict):raise ValueError('Copie figée absente.')
-            if op['kind']=='contract_extend' and not isinstance(op.get('original'),dict):raise ValueError('Version initiale absente.')
+            if op['kind'] in ('contract_extend','contract_update','contract_cancel','contract_delete') and not isinstance(op.get('original'),dict):raise ValueError('Version initiale absente.')
         if len(json.dumps(op))>6_000_000:raise ValueError('Document trop volumineux.')
         if op.get('signature'):
             signature=op['signature']
@@ -256,6 +256,17 @@ class Relay:
         if isinstance(data,Path):body=data.read_bytes();mime=mimetypes.guess_type(data.name)[0] or 'application/octet-stream'
         else:body=json.dumps(data,ensure_ascii=False).encode();mime='application/json'
         headers=[('Content-Type',mime),('Content-Length',str(len(body))),('X-Content-Type-Options','nosniff'),('Referrer-Policy','no-referrer'),('Cache-Control','no-store' if mime=='application/json' else 'no-cache'),('X-Frame-Options','DENY')]
+        # Browsers negotiate gzip automatically; older PC clients keep plain JSON.
+        accepted=e.get('HTTP_ACCEPT_ENCODING','')
+        gzip_ok=any(part.split(';')[0].strip().lower()=='gzip' and not any(v.strip() in ('q=0','q=0.0','q=0.00','q=0.000') for v in part.split(';')[1:]) for part in accepted.split(','))
+        if mime=='application/json':
+            headers.append(('Vary','Accept-Encoding'))
+            if gzip_ok and len(body)>=2048:
+                compressed=gzip.compress(body,compresslevel=3)
+                if len(compressed)<len(body):
+                    body=compressed
+                    headers=[(k,v) for k,v in headers if k!='Content-Length']
+                    headers.extend([('Content-Encoding','gzip'),('Content-Length',str(len(body)))])
         start(str(status)+' '+{200:'OK',400:'Bad Request',401:'Unauthorized',404:'Not Found',503:'Service Unavailable'}[status],headers);return [body]
 class ThreadedServer(ThreadingMixIn,WSGIServer):daemon_threads=True
 if __name__=='__main__':
